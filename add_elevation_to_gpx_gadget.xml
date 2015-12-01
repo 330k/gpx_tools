@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+  <ModulePrefs title="Add Elevation to GPX" height="500" scaling="false" />
+  <Content type="html"><![CDATA[ 
+<!DOCTYPE html>
+<html lang="ja">
+<!--
+    Copyright (c) 2014 Kei Misawa
+
+    This software is released under the MIT License.
+
+    http://opensource.org/licenses/mit-license.php
+-->
+<head>
+<meta charset="utf-8"/>
+<title>Add Elevation to GPX</title>
+<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script>
+</head>
+<body>
+Select GPX File: <input type="file" id="gpx_files" />
+<textarea id="gpx_before" rows="1000000" style="width:100%; height:200px;">
+<?xml version="1.0" encoding="UTF-8" ?>
+<gpx version="1.1"
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+   <trk>
+      <name>Google Driving Directions Track</name>
+      <trkseg>
+      <trkpt lat="35.01252" lon="136.93146"></trkpt>
+      <trkpt lat="35.01373" lon="136.92865"></trkpt>
+      <trkpt lat="35.01382" lon="136.9281"></trkpt>
+      <trkpt lat="35.01394" lon="136.92769"></trkpt>
+      <trkpt lat="35.01497" lon="136.92579"></trkpt>
+      <trkpt lat="35.01542" lon="136.92463"></trkpt>
+      </trkseg>
+   </trk>
+</gpx>
+</textarea>
+<button onclick="addElevationToGPX()">Add Elevation Data</button>
+<textarea id="gpx_after" style="width:100%; height:200px;"></textarea>
+<div id="gpx_download"></div>
+<script type="text/javascript" defer="defer">
+// for IE
+if(typeof DOMParser === 'undefined'){
+	DOMParser = function(){};
+
+	DOMParser.prototype.parseFromString = function (str, contentType) {
+		'use strict';
+		if (typeof ActiveXObject !== 'undefined') {
+			var d = new ActiveXObject('MSXML.DomDocument');
+			d.loadXML(str);
+			return d;
+		}else if(typeof XMLHttpRequest !== 'undefined'){
+			var req = new XMLHttpRequest();
+			req.open('GET', 'data:' + (contentType || 'application/xml') +
+			';charset=utf-8,' + encodeURIComponent(str), false);
+			if(req.overrideMimeType){
+				req.overrideMimeType(contentType);
+			}
+			req.send(null);
+			return req.responseXML;
+		}
+	};
+}
+if(typeof XMLSerializer === 'undefined'){
+	XMLSerializer = function(){};
+	
+	XMLSerializer.prototype.serializeToString = function(node){
+		'use strict';
+		return node.xml;
+	};
+}
+
+var parser = new DOMParser();
+var serializer = new XMLSerializer();
+var elevationService = new google.maps.ElevationService();
+
+var UNIT = 100;
+var WAIT = 1000;
+
+function selectGPXFile(evt){
+	'use strict';
+	var files = evt.target.files;
+	var reader = new FileReader();
+	reader.onload = function(evt){
+		document.getElementById('gpx_before').value = reader.result;
+	};
+	reader.readAsText(files[0], 'utf-8');
+}
+
+function addElevationToGPX(){
+	'use strict';
+	var xmlDoc = parser.parseFromString(document.getElementById('gpx_before').value, 'text/xml');
+	
+	var nodes = xmlDoc.getElementsByTagName('trkpt');
+	
+	var locations = [];
+	var total = nodes.length;
+	var count = 0;
+	
+	var e = document.getElementById('gpx_download');
+	while(e.firstChild) e.removeChild(e.firstChild);
+	
+	var ele = xmlDoc.getElementsByTagName('ele');
+	while (ele[0]) ele[0].parentNode.removeChild(ele[0]);
+	
+	for(var j = 0; j < nodes.length; j += UNIT){
+		locations = [];
+		
+		for(var i = j; (i < j + UNIT) && (i < nodes.length); i++){
+			locations.push(new google.maps.LatLng(
+				nodes[i].getAttribute('lat'),
+				nodes[i].getAttribute('lon')
+			));
+		}
+		(function(j, locations){
+			setTimeout(function(){
+				getElevation(locations, function(results){
+					for(var i = 0; i < results.length; i++){
+						var ele = xmlDoc.createElementNS(xmlDoc.documentElement.namespaceURI, 'ele');
+						ele.appendChild(xmlDoc.createTextNode(results[i].elevation));
+						
+						nodes[i + j].insertBefore(ele, nodes[i + j].firstChild);
+						count++;
+					}
+				
+					if(count >= total){
+						var gpx = serializer.serializeToString(xmlDoc);
+						document.getElementById('gpx_after').value = gpx;
+						createGPXDownloadLink(gpx);
+					}else{
+						document.getElementById('gpx_after').value = 'processing... ' + count + '/' + total;
+					}
+				});
+			}, j * WAIT / UNIT);
+		})(j, locations);
+	}
+}
+
+function getElevation(locations, callback) {
+	'use strict';
+	elevationService.getElevationForLocations({
+		locations: locations
+	}, function(results, status) {
+		if (status === google.maps.ElevationStatus.OK) {
+			callback(results);
+		} else if (status === google.maps.ElevationStatus.INVALID_REQUEST) {
+			console.log('リクエストに問題アリ！requestで渡している内容を確認せよ！！');
+		} else if (status === google.maps.ElevationStatus.OVER_QUERY_LIMIT) {
+			console.log('短時間にクエリを送りすぎ！落ち着いて！！');
+		} else if (status === google.maps.ElevationStatus.REQUEST_DENIED) {
+			console.log('このページでは ElevationResult の利用が許可されていない！・・・なぜ！？');
+		} else if (status === google.maps.ElevationStatus.UNKNOWN_ERROR) {
+			console.log('原因不明のなんらかのトラブルが発生した模様。');
+		} else {
+			console.log('えぇ～っと・・、バージョンアップ？');
+		}
+	});
+
+}
+
+function createGPXDownloadLink(gpx){
+	'use strict';
+	try{
+		var e = document.createElement('a');
+	
+		if(window.URL && window.URL.createObjectURL){
+			var blob = new Blob([gpx], {type:'application/xml'});
+	
+			e.href = window.URL.createObjectURL(blob);
+			e.setAttribute('target', '_blank');
+			e.setAttribute('download', 'download.gpx');
+	
+			e.appendChild(document.createTextNode('Download GPX'));
+	
+		}else{
+			e.href = 'data:application/octet-stream,' + encodeURIComponent(gpx);
+			e.appendChild(document.createTextNode('Download GPX'));
+		}
+		
+		document.getElementById('gpx_download').appendChild(e);
+		
+	}catch(err){
+		//alert('ブラウザが対応していません');
+	}
+}
+
+document.getElementById('gpx_files').addEventListener('change', selectGPXFile, false);
+</script>
+
+</body>
+</html>
+]]>
+</Content>
+</Module>
