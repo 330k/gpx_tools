@@ -227,7 +227,7 @@ function splitTrkseg(gpxdocs, threashold){
         }
 
         for(k = 1; k < trkpts.length; k++){
-          time = trkpts[0].querySelector('time');
+          time = trkpts[k].querySelector('time');
           if(time !== null){
             newDate = Date.parse(time.textContent);
             if(newDate - oldDate > threashold){
@@ -452,7 +452,6 @@ function deleteWhitespaces(gpxdocs){
   var i = 0;
 
   for(i = 0; i < gpxdocs.length; i++){
-    console.log(gpxdocs[i].rootNode);
     _deleteWhitespaces(gpxdocs[i].querySelector('gpx'));
   }
 
