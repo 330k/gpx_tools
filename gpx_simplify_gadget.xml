@@ -17,7 +17,7 @@
  <script type="text/javascript" src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
  <script type="text/javascript" src="https://code.jquery.com/ui/1.12.0/jquery-ui.min.js"></script>
  <script type="text/javascript" src="https://maps.google.com/maps/api/js?key=AIzaSyCir56M7J9LT4-3wDVgG8etGo_HPSMWVBk"></script>
- <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.0/themes/redmond/jquery-ui.css" />
+ <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css" />
 </head>
 <body>
  <label>GPX File (複数選択可): <input type="file" id="gpx_files" multiple="multiple" /></label><br />
@@ -37,7 +37,7 @@
    <option value="12">12時間途切れたら</option>
    <option value="24">24時間途切れたら</option>
  </select></label><br />
- <label>各トラック(trkseg)の間引き: <select id="reduce_points">
+ <label>トラック(trkseg)の間引き: <select id="reduce_points">
   <option value="0">間引きなし</option>
   <option value="100">100 points</option>
   <option value="200">200 points</option>
@@ -61,6 +61,13 @@ var parser = new DOMParser(),
   elevationService = new google.maps.ElevationService(),
   xmltexts = [];
   filenames = [];
+
+// UI初期化
+/*$('input:checkbox').checkboxradio();
+$('select').selectmenu();
+$('button').button();*/
+$('#gpx_files').on('change', selectGPXFile);
+$('#process_gpx').on('click', processGPX);
 
 // GPXファイル読み込み
 function selectGPXFile(evt){
@@ -432,7 +439,7 @@ function reducePoints(gpxdocs, reducedPoints){
   }
 }
 
-// 指定したselectorに合致する要素を削除する
+// 指定したselectorに合致する要素を削除する(Edgeはmatches非対応)
 function deleteElements(gpxdocs, selector, excepts){
   'use strict';
   var nodes = null,
@@ -442,7 +449,7 @@ function deleteElements(gpxdocs, selector, excepts){
   for(i = 0; i < gpxdocs.length; i++){
     nodes = gpxdocs[i].querySelectorAll(selector);
     for(j = 0; j < nodes.length; j++){
-      if((excepts === '') || (!nodes[j].matches(excepts))){
+      if((excepts === '') || ((nodes[j].matches !== undefined) && (!nodes[j].matches(excepts)))){
         nodes[j].parentNode.removeChild(nodes[j]);
       }
     }
@@ -456,7 +463,6 @@ function deleteWhitespaces(gpxdocs){
   var i = 0;
 
   for(i = 0; i < gpxdocs.length; i++){
-    console.log(gpxdocs[i].rootNode);
     _deleteWhitespaces(gpxdocs[i].querySelector('gpx'));
   }
 
@@ -585,10 +591,6 @@ function createGPXDownloadLink(gpxdocs, filenames){
     document.getElementById('gpx_download').appendChild(document.createElement('br'));;
   }
 }
-
-// イベント登録
-$('#gpx_files').on('change', selectGPXFile);
-$('#process_gpx').on('click', processGPX);
  </script>
 
 </body>
