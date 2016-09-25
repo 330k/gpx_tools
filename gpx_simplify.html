@@ -576,6 +576,10 @@ function createGPXDownloadLink(gpxdocs, filenames){
       e.setAttribute('download', filenames[i]);
       e.appendChild(document.createTextNode('Download ' + filenames[i]));
 
+      if(window.navigator.msSaveBlob){
+        // IE, Edge
+        e.addEventListener('click', window.navigator.msSaveBlob(blob, filename)); 
+      }
     }else{
       e.href = 'data:application/octet-stream,' + encodeURIComponent(gpx);
       e.setAttribute('download', 'download.gpx');
