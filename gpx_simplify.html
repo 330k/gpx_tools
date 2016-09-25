@@ -578,9 +578,12 @@ function createGPXDownloadLink(gpxdocs, filenames){
 
       if(window.navigator.msSaveBlob){
         // IE, Edge
-        e.addEventListener('click', function(){
-          window.navigator.msSaveBlob(blob, filenames[i]);
-        }); 
+        (function(blob, filename){
+          e.addEventListener('click', function(){
+            window.navigator.msSaveBlob(blob, filename);
+            return false;
+          });
+        })(blob, filenames[i]); 
       }
     }else{
       e.href = 'data:application/octet-stream,' + encodeURIComponent(gpx);
