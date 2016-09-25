@@ -581,9 +581,10 @@ function createGPXDownloadLink(gpxdocs, filenames){
         (function(blob, filename){
           e.addEventListener('click', function(evt){
             window.navigator.msSaveBlob(blob, filename);
+            evt.preventDefault();
+            return false;
           });
         })(blob, filenames[i]);
-        e.href = 'javascript:void(0);';
       }
     }else{
       e.href = 'data:application/octet-stream,' + encodeURIComponent(gpx);
