@@ -578,7 +578,7 @@ function createGPXDownloadLink(gpxdocs, filenames){
 
       if(window.navigator.msSaveBlob){
         // IE, Edge
-        e.addEventListener('click', window.navigator.msSaveBlob(blob, filename)); 
+        e.addEventListener('click', window.navigator.msSaveBlob(blob, filenames[i])); 
       }
     }else{
       e.href = 'data:application/octet-stream,' + encodeURIComponent(gpx);
