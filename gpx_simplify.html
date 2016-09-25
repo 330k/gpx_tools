@@ -579,11 +579,11 @@ function createGPXDownloadLink(gpxdocs, filenames){
       if(window.navigator.msSaveBlob){
         // IE, Edge
         (function(blob, filename){
-          e.addEventListener('click', function(){
+          e.addEventListener('click', function(e){
             window.navigator.msSaveBlob(blob, filename);
-            return false;
+            e.stopPropagation();
           });
-        })(blob, filenames[i]); 
+        })(blob, filenames[i]);
       }
     }else{
       e.href = 'data:application/octet-stream,' + encodeURIComponent(gpx);
