@@ -59,10 +59,11 @@
  <br />
  <div id="gpx_download"></div>
  <script type="text/javascript">
+/* globals google, $ */
 var parser = new DOMParser(),
   serializer = new XMLSerializer(),
   elevationService = new google.maps.ElevationService(),
-  xmltexts = [];
+  xmltexts = [],
   filenames = [];
 
 // UI初期化
@@ -82,20 +83,20 @@ function selectGPXFile(evt){
     xmltexts = [];
     filenames = [];
     for(i = 0; i < files.length; i++){
-      readGPX(files[i]);
+      readGPX(files[i], i);
     }
   }catch(err){
     alert('ブラウザが対応していません');
   }
 }
 
-function readGPX(file){
+function readGPX(file, index){
   'use strict';
   var reader = new FileReader();
 
   reader.onload = function(){
-    xmltexts.push(reader.result);
-    filenames.push(file.name);
+    xmltexts[index] = reader.result;
+    filenames[index] = file.name;
     $('#gpx_filenames').html(filenames.join(','));
   };
   reader.readAsText(file, 'utf-8');
@@ -217,6 +218,7 @@ function mergeTrkseg(gpxdocs){
 
 // 一定間隔以上途切れた場合にtrksegを分割(threshold: ミリ秒単位)
 function splitTrkseg(gpxdocs, threashold){
+  'use strict';
   var trksegs = null,
     trkpts = null,
     time = null,
@@ -285,7 +287,6 @@ function reducePoints(gpxdocs, reducedPoints){
   return;
 
   function reducePoints2(trkpts, targetPoints){
-    'use strict';
     var pts = [],
       queue = new PriorityQueue(),
       flag = [],
@@ -339,7 +340,6 @@ function reducePoints(gpxdocs, reducedPoints){
   }
 
   function findFarthest(pts, start, end){
-    'use strict';
     var a = pts[start],
       b = pts[end],
       d = 0.0,
@@ -359,7 +359,6 @@ function reducePoints(gpxdocs, reducedPoints){
   }
 
   function segmentPointDistance(ax, ay, bx, by, px, py){
-    'use strict';
     var t = (ax * ax + ay * ay + bx * px - ax * (bx + px) + by * py - ay * (by + py))/(ax * ax + ay * ay - 2 * ax * bx + bx * bx - 2 * ay * by + by * by),
       x = ax - (ax - bx) * t,
       y = ay - (ay - by) * t;
@@ -376,7 +375,6 @@ function reducePoints(gpxdocs, reducedPoints){
 
   // Pairingヒープ
   function PriorityQueue(){
-    'use strict';
     this.name = 'Pairing Heap';
     this._size = 0;
     this._root = null;
@@ -513,11 +511,13 @@ function deleteWhitespaces(gpxdocs){
 // 標高をGoogle Elevations APIから取得
 function addElevationToGPX(gpxdoc){
 	'use strict';
-	var nodes = gpxdoc.getElementsByTagName('trkpt'),
+	var UNIT = 100,
+    WAIT = 1000,
+    nodes = gpxdoc.getElementsByTagName('trkpt'),
     locations = [],
     total = nodes.length,
     count = 0,
-	  ele = gpxdoc.getElementsByTagName('ele');
+	  ele = gpxdoc.getElementsByTagName('ele'),
     i = 0,
     j = 0;
 
@@ -589,7 +589,7 @@ function createGPXDownloadLink(gpxdocs, filenames){
 
   for(i = 0; i < gpxdocs.length; i++){
     // カシミール向けに空要素を生成しない
-    gpxtext = serializer.serializeToString(gpxdocs[i]).replace(/\<trkpt(.*?)\/\>/g, '<trkpt$1><\/trkpt>');
+    gpxtext = serializer.serializeToString(gpxdocs[i]).replace(/<trkpt(.*?)\/>/g, '<trkpt$1><\/trkpt>');
     e = document.createElement('a');
       
     if(window.URL && window.URL.createObjectURL){
@@ -616,14 +616,14 @@ function createGPXDownloadLink(gpxdocs, filenames){
         })(blob, filenames[i]);
       }
     }else{
-      e.href = 'data:application/octet-stream,' + encodeURIComponent(gpx);
+      e.href = 'data:application/octet-stream,' + encodeURIComponent(gpxtext);
       e.setAttribute('download', 'download.gpx');
       
       e.appendChild(document.createTextNode('Download GPX'));
     }
     
     document.getElementById('gpx_download').appendChild(e);
-    document.getElementById('gpx_download').appendChild(document.createElement('br'));;
+    document.getElementById('gpx_download').appendChild(document.createElement('br'));
   }
 }
  </script>
