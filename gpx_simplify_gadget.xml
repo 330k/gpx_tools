@@ -47,6 +47,13 @@
   <option value="4000">4000 points</option>
   <option value="8000">8000 points</option>
  </select></label><br />
+ <label>緯度経度の精度: <select id="latlon_precision">
+  <option value="0">変更なし</option>
+  <option value="5">小数点以下5桁</option>
+  <option value="6" selected="selected">小数点以下6桁</option>
+  <option value="7">小数点以下7桁</option>
+  <option value="8">小数点以下8桁</option>
+ </select></label><br />
  <label><input type="checkbox" id="delete_ele" checked="checked" />標高(ele要素)を削除</label><br />
  <label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label><br />
  <label><input type="checkbox" id="delete_others" checked="checked" />その他のtrkptの子要素を削除(Edge非対応)</label><br />
@@ -125,6 +132,9 @@ function processGPX(){
   }
   if($('#reduce_points').val() > 0){
     reducePoints(xmldocs, $('#reduce_points').val() - 0);
+  }
+  if($('#latlon_precision').val() > 0){
+    setPrecisionLatLon(xmldocs, $('#latlon_precision').val() - 0);
   }
   if($('#delete_ele').prop('checked') === true){
     deleteElements(xmldocs, 'trkpt > ele', '');
@@ -255,7 +265,6 @@ function splitTrkseg(gpxdocs, threashold){
       }
     }
   }
-  return gpxdocs;
 } 
 
 // trksegごとに指定した数までtrkpt要素を削減
@@ -436,6 +445,26 @@ function reducePoints(gpxdocs, reducedPoints){
     };
     
     return this;
+  }
+}
+
+// 緯度と経度の精度を変更
+function setPrecisionLatLon(gpxdocs, precision){
+  'use strict';
+  var trkpts = null,
+    lat = 0.0,
+    lon = 0.0,
+    i = 0,
+    j = 0;
+
+  for(i = 0; i < gpxdocs.length; i++){
+    trkpts = gpxdocs[i].querySelectorAll('trkpt');
+    for(j = 0; j < trkpts.length; j++){
+      lat = Number.parseFloat(trkpts[j].getAttribute('lat'));
+      lon = Number.parseFloat(trkpts[j].getAttribute('lon'));
+      trkpts[j].setAttribute('lat', lat.toFixed(precision));
+      trkpts[j].setAttribute('lon', lon.toFixed(precision));
+    }
   }
 }
 
