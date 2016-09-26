@@ -87,20 +87,20 @@ function selectGPXFile(evt){
     xmltexts = [];
     filenames = [];
     for(i = 0; i < files.length; i++){
-      readGPX(files[i]);
+      readGPX(files[i], i);
     }
   }catch(err){
     alert('ブラウザが対応していません');
   }
 }
 
-function readGPX(file){
+function readGPX(file, index){
   'use strict';
   var reader = new FileReader();
 
   reader.onload = function(){
-    xmltexts.push(reader.result);
-    filenames.push(file.name);
+    xmltexts[index] = reader.result;
+    filenames[index] = file.name;
     $('#gpx_filenames').html(filenames.join(','));
   };
   reader.readAsText(file, 'utf-8');
