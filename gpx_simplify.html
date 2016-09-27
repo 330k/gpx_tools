@@ -551,34 +551,37 @@ function addElevation(gpxdocs, callback){
         ));
         trkptArrs.push(trkpts[k]);
       }
-      setTimeout(getElevation(gpxdocs[i], trkptArrs, locations), c * WAIT);
+      getElevation(gpxdocs[i], trkptArrs, locations, c * WAIT);
       c++;
     }
   }
 
-  function getElevation(gpxdoc, trkpts, locations){
-    elevationService.getElevationForLocations({
-      locations: locations
-    }, function(results, status) {
-      var i = 0;
-      console.log(status);
-      if(status === google.maps.ElevationStatus.OK){
-        for(i = 0; i < results.length; i++){
-          var ele = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, 'ele');
-          ele.appendChild(gpxdoc.createTextNode(results[i].elevation.toFixed(2)));
-          
-          trkpts[i].appendChild(ele);
+  function getElevation(gpxdoc, trkpts, locations, wait){
+    setTimeout(function(){
+      elevationService.getElevationForLocations({
+        locations: locations
+      }, function(results, status) {
+        var i = 0;
+        console.log(status);
+        if(status === google.maps.ElevationStatus.OK){
+          for(i = 0; i < results.length; i++){
+            var ele = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, 'ele');
+            ele.appendChild(gpxdoc.createTextNode(results[i].elevation.toFixed(2)));
+            
+            trkpts[i].appendChild(ele);
+          }
         }
-      }
-      count += locations.length;
-      
-      console.log('add elevation: ' + count + '/' + total)
-      if(count >= total){
-        callback();
-      }else{
-        //document.getElementById('gpx_after').value = 'processing... ' + count + '/' + total;
-      }
-    });
+        count += locations.length;
+        
+        console.log('add elevation: ' + count + '/' + total)
+        if(count >= total){
+          callback();
+        }else{
+          //document.getElementById('gpx_after').value = 'processing... ' + count + '/' + total;
+        }
+      });
+    }, wait
+    );
   }
 }
 
