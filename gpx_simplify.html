@@ -525,6 +525,7 @@ function addElevation(gpxdocs, callback){
     locations = [],
     trkptArrs = [],
     count = 0,
+    total = 0,
 	  ele = null,
     i = 0,
     j = 0,
@@ -538,6 +539,7 @@ function addElevation(gpxdocs, callback){
     }
     
     trkpts = gpxdocs[i].querySelectorAll('trkpt');
+    total += trkpts.length;
     for(j = 0; j < trkpts.length; j += UNIT){
       locations = [];
       trkptArrs = [];
@@ -549,13 +551,12 @@ function addElevation(gpxdocs, callback){
         ));
         trkptArrs.push(trkpts[k]);
       }
-      console.log('add elevation: ' + c);
-      setTimeout(getElevation(gpxdocs[i], trkptArrs, locations, callback), c * WAIT);
+      setTimeout(getElevation(gpxdocs[i], trkptArrs, locations), c * WAIT);
       c++;
     }
   }
 
-  function getElevation(gpxdoc, trkpts, locations, callback){
+  function getElevation(gpxdoc, trkpts, locations){
     elevationService.getElevationForLocations({
       locations: locations
     }, function(results, status) {
@@ -570,7 +571,8 @@ function addElevation(gpxdocs, callback){
         }
       }
       count += locations.length;
-    
+      
+      console.log('add elevation: ' + count + '/' + total)
       if(count >= total){
         callback();
       }else{
