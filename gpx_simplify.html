@@ -577,7 +577,7 @@ function addElevation(gpxdocs, callback){
         if(count >= total){
           callback();
         }else{
-          //document.getElementById('gpx_after').value = 'processing... ' + count + '/' + total;
+          progressMessage('Add elevation... : ' + count + ' / ' + total);
         }
       });
     }, wait
@@ -632,6 +632,11 @@ function createGPXDownloadLink(gpxdocs, filenames){
     document.getElementById('gpx_download').appendChild(e);
     document.getElementById('gpx_download').appendChild(document.createElement('br'));
   }
+}
+
+// 進捗状況を表示
+function progressMessage(message){
+  document.getElementById('gpx_download').textContent = message;
 }
  </script>
 
