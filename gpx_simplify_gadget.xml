@@ -58,6 +58,7 @@
  <label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label><br />
  <label><input type="checkbox" id="delete_others" checked="checked" />その他のtrkptの子要素を削除(Edge非対応)</label><br />
  <label><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label><br />
+ <label><input type="checkbox" id="add_ele" />Google Maps Elevations APIで標高を追加(100点/秒)</label><br />
  <br />
  <button id="process_gpx">処理実行</button><br />
  <br />
@@ -150,7 +151,13 @@ function processGPX(){
     deleteWhitespaces(xmldocs);
   }
 
-  createGPXDownloadLink(xmldocs, filenames);
+  if($('#add_ele').prop('checked') === true){
+    addElevation(xmldocs, function(){
+      createGPXDownloadLink(xmldocs, filenames);
+    });
+  }else{
+    createGPXDownloadLink(xmldocs, filenames);
+  }
 }
 
 // 複数のGPXファイルをマージ
@@ -475,6 +482,7 @@ function deleteElements(gpxdocs, selector, excepts){
 
   for(i = 0; i < gpxdocs.length; i++){
     nodes = gpxdocs[i].querySelectorAll(selector);
+    // querySelectorAllは静的なので、普通に加算して削除してOK
     for(j = 0; j < nodes.length; j++){
       if((excepts === '') || ((nodes[j].matches !== undefined) && (!nodes[j].matches(excepts)))){
         nodes[j].parentNode.removeChild(nodes[j]);
@@ -513,73 +521,73 @@ function deleteWhitespaces(gpxdocs){
 }
 
 // 標高をGoogle Elevations APIから取得
-function addElevationToGPX(gpxdoc){
+function addElevation(gpxdocs, callback){
 	'use strict';
-	var UNIT = 100,
-    WAIT = 1000,
-    nodes = gpxdoc.getElementsByTagName('trkpt'),
+	const UNIT = 100,
+    WAIT = 1000;
+  var trkpts = null,
     locations = [],
-    total = nodes.length,
+    trkptArrs = [],
     count = 0,
-	  ele = gpxdoc.getElementsByTagName('ele'),
+    total = 0,
+	  ele = null,
     i = 0,
-    j = 0;
+    j = 0,
+    k = 0,
+    c = 0;
+  
+  for(i = 0; i < gpxdocs.length; i++){
+    ele = gpxdocs[i].querySelectorAll('ele');
+    for(j = 0; j < ele.length; j++){
+      ele[j].parentNode.removeChild(ele[j]);
+    }
+    
+    trkpts = gpxdocs[i].querySelectorAll('trkpt');
+    total += trkpts.length;
+    for(j = 0; j < trkpts.length; j += UNIT){
+      locations = [];
+      trkptArrs = [];
+      
+      for(k = j; (k < j + UNIT) && (k < trkpts.length); k++){
+        locations.push(new google.maps.LatLng(
+          trkpts[k].getAttribute('lat'),
+          trkpts[k].getAttribute('lon')
+        ));
+        trkptArrs.push(trkpts[k]);
+      }
+      getElevation(gpxdocs[i], trkptArrs, locations, c * WAIT);
+      c++;
+    }
+  }
 
-	while (ele[0]) ele[0].parentNode.removeChild(ele[0]);
-	
-	for(j = 0; j < nodes.length; j += UNIT){
-		locations = [];
-		
-		for(i = j; (i < j + UNIT) && (i < nodes.length); i++){
-			locations.push(new google.maps.LatLng(
-				nodes[i].getAttribute('lat'),
-				nodes[i].getAttribute('lon')
-			));
-		}
-		(function(j, locations){
-			setTimeout(function(){
-				getElevation(locations, function(results){
-					for(var i = 0; i < results.length; i++){
-						var ele = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, 'ele');
-						ele.appendChild(gpxdoc.createTextNode(results[i].elevation));
-						
-						nodes[i + j].insertBefore(ele, nodes[i + j].firstChild);
-						count++;
-					}
-				
-					if(count >= total){
-						var gpx = serializer.serializeToString(gpxdoc);
-						document.getElementById('gpx_after').value = gpx;
-						createGPXDownloadLink(gpx);
-					}else{
-						document.getElementById('gpx_after').value = 'processing... ' + count + '/' + total;
-					}
-				});
-			}, j * WAIT / UNIT);
-		})(j, locations);
-	}
-}
-
-function getElevation(locations, callback) {
-	'use strict';
-	elevationService.getElevationForLocations({
-		locations: locations
-	}, function(results, status) {
-		if (status === google.maps.ElevationStatus.OK) {
-			callback(results);
-		} else if (status === google.maps.ElevationStatus.INVALID_REQUEST) {
-			console.log('リクエストに問題アリ！requestで渡している内容を確認せよ！！');
-		} else if (status === google.maps.ElevationStatus.OVER_QUERY_LIMIT) {
-			console.log('短時間にクエリを送りすぎ！落ち着いて！！');
-		} else if (status === google.maps.ElevationStatus.REQUEST_DENIED) {
-			console.log('このページでは ElevationResult の利用が許可されていない！・・・なぜ！？');
-		} else if (status === google.maps.ElevationStatus.UNKNOWN_ERROR) {
-			console.log('原因不明のなんらかのトラブルが発生した模様。');
-		} else {
-			console.log('えぇ～っと・・、バージョンアップ？');
-		}
-	});
-
+  function getElevation(gpxdoc, trkpts, locations, wait){
+    setTimeout(function(){
+      elevationService.getElevationForLocations({
+        locations: locations
+      }, function(results, status) {
+        var i = 0;
+        console.log(status);
+        if(status === google.maps.ElevationStatus.OK){
+          for(i = 0; i < results.length; i++){
+            var ele = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, 'ele');
+            ele.appendChild(gpxdoc.createTextNode(results[i].elevation.toFixed(2)));
+            
+            trkpts[i].appendChild(ele);
+          }
+        }
+        count += locations.length;
+        
+        console.log('add elevation: ' + count + '/' + total)
+        if(count >= total){
+          progressMessage('');
+          callback();
+        }else{
+          progressMessage('Add elevation... : ' + count + ' / ' + total);
+        }
+      });
+    }, wait
+    );
+  }
 }
 
 // GPXファイルのダウンロードリンクを作成
@@ -629,6 +637,11 @@ function createGPXDownloadLink(gpxdocs, filenames){
     document.getElementById('gpx_download').appendChild(e);
     document.getElementById('gpx_download').appendChild(document.createElement('br'));
   }
+}
+
+// 進捗状況を表示
+function progressMessage(message){
+  document.getElementById('gpx_download').textContent = message;
 }
  </script>
 
