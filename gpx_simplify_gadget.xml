@@ -20,7 +20,7 @@
  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css" />
 </head>
 <body>
- <label>GPXファイル(複数選択可): <input type="file" id="gpx_files" multiple="multiple" /></label><br />
+ <label>GPXファイル(複数選択可): <input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
  <div id="gpx_filenames"></div>
  <br />
  <label><input type="checkbox" id="merge_gpx" checked="checked" />複数のGPXファイルの内容を1つにまとめる</label><br />
