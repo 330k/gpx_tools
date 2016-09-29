@@ -77,6 +77,14 @@ $('select').selectmenu();
 $('button').button();*/
 $('#gpx_files').on('change', selectGPXFile);
 $('#process_gpx').on('click', processGPX);
+$('#add_ele').on('change', function(){
+  if($('#add_ele').prop('checked')){
+    $('#delete_ele').prop('disabled', true);
+    $('#delete_ele').prop('checked', false)
+  }else{
+    $('#delete_ele').prop('disabled', false);
+  }
+})
 
 // GPXファイル読み込み
 function selectGPXFile(evt){
@@ -113,50 +121,54 @@ function processGPX(){
   var xmldocs = [],
     i = 0;
 
-  $('#gpx_download').empty();
-  
-  for(i = 0; i < xmltexts.length; i++){
-    xmldocs.push(parser.parseFromString(xmltexts[i], 'text/xml'));
-    console.log('xml parsed : ' + filenames[i]);
-  }
+  try{
+    $('#gpx_download').empty();
+    
+    for(i = 0; i < xmltexts.length; i++){
+      xmldocs.push(parser.parseFromString(xmltexts[i], 'text/xml'));
+      console.log('xml parsed : ' + filenames[i]);
+    }
 
-  if($('#merge_gpx').prop('checked') === true){
-    mergeGPX(xmldocs);
-  }
-  if($('#merge_trk').prop('checked') === true){
-    mergeTrk(xmldocs);
-  }
-  if($('#merge_trkseg').prop('checked') === true){
-    mergeTrkseg(xmldocs);
-  }
-  if($('#split_trkseg').val() > 0){
-    splitTrkseg(xmldocs, $('#split_trkseg').val() * 3600 * 1000);
-  }
-  if($('#reduce_points').val() > 0){
-    reducePoints(xmldocs, $('#reduce_points').val() - 0);
-  }
-  if($('#latlon_precision').val() > 0){
-    setPrecisionLatLon(xmldocs, $('#latlon_precision').val() - 0);
-  }
-  if($('#delete_ele').prop('checked') === true){
-    deleteElements(xmldocs, 'trkpt > ele', '');
-  }
-  if($('#delete_time').prop('checked') === true){
-    deleteElements(xmldocs, 'trkpt > time', '');
-  }
-  if($('#delete_others').prop('checked') === true){
-    deleteElements(xmldocs, 'trkpt > *', 'ele, time');
-  }
-  if($('#delete_whitespaces').prop('checked') === true){
-    deleteWhitespaces(xmldocs);
-  }
+    if($('#merge_gpx').prop('checked') === true){
+      mergeGPX(xmldocs);
+    }
+    if($('#merge_trk').prop('checked') === true){
+      mergeTrk(xmldocs);
+    }
+    if($('#merge_trkseg').prop('checked') === true){
+      mergeTrkseg(xmldocs);
+    }
+    if($('#split_trkseg').val() > 0){
+      splitTrkseg(xmldocs, $('#split_trkseg').val() * 3600 * 1000);
+    }
+    if($('#reduce_points').val() > 0){
+      reducePoints(xmldocs, $('#reduce_points').val() - 0);
+    }
+    if($('#latlon_precision').val() > 0){
+      setPrecisionLatLon(xmldocs, $('#latlon_precision').val() - 0);
+    }
+    if($('#delete_ele').prop('checked') === true){
+      deleteElements(xmldocs, 'trkpt > ele, rtept > ele, wpt > ele', '');
+    }
+    if($('#delete_time').prop('checked') === true){
+      deleteElements(xmldocs, 'trkpt > time, rtept > time, wpt > time', '');
+    }
+    if($('#delete_others').prop('checked') === true){
+      deleteElements(xmldocs, 'trkpt > *, rtept > *, wpt > *', 'ele, time');
+    }
+    if($('#delete_whitespaces').prop('checked') === true){
+      deleteWhitespaces(xmldocs);
+    }
 
-  if($('#add_ele').prop('checked') === true){
-    addElevation(xmldocs, function(){
+    if($('#add_ele').prop('checked') === true){
+      addElevation(xmldocs, function(){
+        createGPXDownloadLink(xmldocs, filenames);
+      });
+    }else{
       createGPXDownloadLink(xmldocs, filenames);
-    });
-  }else{
-    createGPXDownloadLink(xmldocs, filenames);
+    }
+  }catch(e){
+    $('#gpx_download').html('Error: ' + e.message);
   }
 }
 
@@ -170,7 +182,7 @@ function mergeGPX(gpxdocs){
   for(i = 1; i < gpxdocs.length; i++){
     nodes = gpxdocs[i].querySelectorAll('gpx > wpt, gpx > rte, gpx > trk');
     for(j = 0; j < nodes.length; j++){
-      gpxdocs[0].querySelector('gpx').appendChild(nodes[j]);
+      gpxdocs[0].documentElement.appendChild(nodes[j]);
     }
   }
   while(gpxdocs.length > 1){
@@ -463,7 +475,7 @@ function setPrecisionLatLon(gpxdocs, precision){
     j = 0;
 
   for(i = 0; i < gpxdocs.length; i++){
-    trkpts = gpxdocs[i].querySelectorAll('trkpt');
+    trkpts = gpxdocs[i].querySelectorAll('trkpt, rtept, wpt');
     for(j = 0; j < trkpts.length; j++){
       lat = trkpts[j].getAttribute('lat') - 0;
       lon = trkpts[j].getAttribute('lon') - 0;
@@ -498,7 +510,7 @@ function deleteWhitespaces(gpxdocs){
   var i = 0;
 
   for(i = 0; i < gpxdocs.length; i++){
-    _deleteWhitespaces(gpxdocs[i].querySelector('gpx'));
+    _deleteWhitespaces(gpxdocs[i].documentElement);
   }
 
   // 再帰的にホワイトスペースを削除する
@@ -542,7 +554,7 @@ function addElevation(gpxdocs, callback){
       ele[j].parentNode.removeChild(ele[j]);
     }
     
-    trkpts = gpxdocs[i].querySelectorAll('trkpt');
+    trkpts = gpxdocs[i].querySelectorAll('trkpt, rtept, wpt');
     total += trkpts.length;
     for(j = 0; j < trkpts.length; j += UNIT){
       locations = [];
