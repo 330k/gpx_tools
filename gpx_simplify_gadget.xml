@@ -465,8 +465,8 @@ function setPrecisionLatLon(gpxdocs, precision){
   for(i = 0; i < gpxdocs.length; i++){
     trkpts = gpxdocs[i].querySelectorAll('trkpt');
     for(j = 0; j < trkpts.length; j++){
-      lat = Number.parseFloat(trkpts[j].getAttribute('lat'));
-      lon = Number.parseFloat(trkpts[j].getAttribute('lon'));
+      lat = trkpts[j].getAttribute('lat') - 0;
+      lon = trkpts[j].getAttribute('lon') - 0;
       trkpts[j].setAttribute('lat', lat.toFixed(precision));
       trkpts[j].setAttribute('lon', lon.toFixed(precision));
     }
