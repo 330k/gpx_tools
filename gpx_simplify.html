@@ -50,11 +50,18 @@
   <option value="7">小数点以下7桁</option>
   <option value="8">小数点以下8桁</option>
  </select></label><br />
- <label><input type="checkbox" id="delete_ele" checked="checked" />標高(ele要素)を削除</label><br />
+ <label>高度(ele要素)の削除/精度/修正: <select id="ele_process">
+  <option value="null">変更なし</option>
+  <option value="delete">ele要素を削除</option>
+  <option value="toFixed_0">整数に丸める</option>
+  <option value="toFixed_1" selected="selected">小数点以下1桁</option>
+  <option value="toFixed_2">小数点以下2桁</option>
+  <option value="toFixed_3">小数点以下3桁</option>
+  <option value="google">Google Maps Elevations APIの標高に修正(100点/秒)</option>
+ </select></label><br />
  <label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label><br />
- <label><input type="checkbox" id="delete_others" checked="checked" />その他のtrkptの子要素を削除(Edge非対応)</label><br />
+ <label><input type="checkbox" id="delete_others" checked="checked" />ele要素とtime要素以外のtrkptの子要素を削除(Edge非対応)</label><br />
  <label><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label><br />
- <label><input type="checkbox" id="add_ele" />Google Maps Elevations APIで標高を追加(100点/秒)</label><br />
  <br />
  <button id="process_gpx">処理実行</button><br />
  <br />
@@ -143,8 +150,11 @@ function processGPX(){
     if($('#latlon_precision').val() > 0){
       setPrecisionLatLon(xmldocs, $('#latlon_precision').val() - 0);
     }
-    if($('#delete_ele').prop('checked') === true){
+    if($('#ele_process').val() === 'delete'){
       deleteElements(xmldocs, 'trkpt > ele, rtept > ele, wpt > ele', '');
+    }
+    if($('#ele_process').val().match(/toFixed_(\d+)/)){
+      setPrecisionEle(xmldocs, $('#ele_process').val().match(/toFixed_(\d+)/)[1] - 0);
     }
     if($('#delete_time').prop('checked') === true){
       deleteElements(xmldocs, 'trkpt > time, rtept > time, wpt > time', '');
@@ -156,7 +166,7 @@ function processGPX(){
       deleteWhitespaces(xmldocs);
     }
 
-    if($('#add_ele').prop('checked') === true){
+    if($('#ele_process').val() === 'google'){
       addElevation(xmldocs, function(){
         createGPXDownloadLink(xmldocs, filenames);
       });
@@ -477,6 +487,23 @@ function setPrecisionLatLon(gpxdocs, precision){
       lon = trkpts[j].getAttribute('lon') - 0;
       trkpts[j].setAttribute('lat', lat.toFixed(precision));
       trkpts[j].setAttribute('lon', lon.toFixed(precision));
+    }
+  }
+}
+
+// 高度の精度を変更
+function setPrecisionEle(gpxdocs, precision){
+  'use strict';
+  var nodes = null,
+    ele = 0.0,
+    i = 0,
+    j = 0;
+console.log(precision);
+  for(i = 0; i < gpxdocs.length; i++){
+    nodes = gpxdocs[i].querySelectorAll('trkpt > ele, rtept > ele, wpt > ele');
+    for(j = 0; j < nodes.length; j++){
+      ele = nodes[j].textContent - 0;
+      nodes[j].textContent = ele.toFixed(precision);
     }
   }
 }
