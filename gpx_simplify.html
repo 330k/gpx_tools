@@ -80,14 +80,6 @@ $('select').selectmenu();
 $('button').button();*/
 $('#gpx_files').on('change', selectGPXFile);
 $('#process_gpx').on('click', processGPX);
-$('#add_ele').on('change', function(){
-  if($('#add_ele').prop('checked')){
-    $('#delete_ele').prop('disabled', true);
-    $('#delete_ele').prop('checked', false)
-  }else{
-    $('#delete_ele').prop('disabled', false);
-  }
-})
 
 // GPXファイル読み込み
 function selectGPXFile(evt){
