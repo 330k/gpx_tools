@@ -494,7 +494,7 @@ function setPrecisionEle(gpxdocs, precision){
     ele = 0.0,
     i = 0,
     j = 0;
-console.log(precision);
+    
   for(i = 0; i < gpxdocs.length; i++){
     nodes = gpxdocs[i].querySelectorAll('trkpt > ele, rtept > ele, wpt > ele');
     for(j = 0; j < nodes.length; j++){
@@ -526,6 +526,25 @@ function deleteElements(gpxdocs, selector, excepts){
 // ホワイトスペースを削除する
 function deleteWhitespaces(gpxdocs){
   'use strict';
+  /*
+  var trkpts = null,
+    children = null,
+    i = 0,
+    j = 0,
+    k = 0;
+
+  // trkpt要素の子要素間にある空白を削除する
+  for(i = 0; i < gpxdocs.length; i++){
+    trkpts = gpxdocs[i].querySelectorAll('trkpt, rtept, wpt');
+    for(j = 0; j < trkpts.length; j++){
+      children = trkpts[j].childNodes;
+      for(k = 0; k < children.length; k++){
+        if(children[k].nodeType === 3){
+          children[k].nodeValue = '';
+        }
+      }
+    }
+  }*/
   var i = 0;
 
   for(i = 0; i < gpxdocs.length; i++){
@@ -535,17 +554,18 @@ function deleteWhitespaces(gpxdocs){
   // 再帰的にホワイトスペースを削除する
   function _deleteWhitespaces(node){
     var children = null,
-      i = 0;
+      j = 0;
     
     node.normalize();
     children = node.childNodes;
-    for(i = 0; i < children.length; i++){
-      if(children[i].nodeType === 1){
-        _deleteWhitespaces(children[i]);
+    for(j = 0; j < children.length; j++){
+      if(children[j].nodeType === 1){
+        _deleteWhitespaces(children[j]);
       }
-      if(children[i].nodeType === 3){
-        // 空白文字及び連続する改行を削除
-        children[i].nodeValue = children[i].nodeValue.replace(/[\t ]+/g, '').replace(/[\r\n]+/g, '\n'); 
+      if((children[j].nodeType === 3) && children[j].nodeValue.match(/^\s+$/)){
+        // ホワイトスペースだけのテキストノードの場合
+        // 空白文字を削除　及び連続する改行は1つにする
+        children[j].nodeValue = children[j].nodeValue.replace(/[\t ]+/g, '').replace(/[\r\n]+/g, '\n'); 
       }
     }
   }
