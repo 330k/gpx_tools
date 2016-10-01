@@ -500,18 +500,22 @@ function setPrecisionEle(gpxdocs, precision){
   }
 }
 
-// 指定したselectorに合致する要素を削除する(Edgeはmatches非対応)
+// 指定したselectorに合致する要素を削除する
 function deleteElements(gpxdocs, selector, excepts){
   'use strict';
   var nodes = null,
     i = 0,
     j = 0;
 
+  // IE, Edgeに対応
+  if((!Element.prototype.matches) && (Element.prototype.msMatchesSelector)){
+    Element.prototype.matches = Element.prototype.msMatchesSelector;
+  }
   for(i = 0; i < gpxdocs.length; i++){
     nodes = gpxdocs[i].querySelectorAll(selector);
     // querySelectorAllは静的なので、普通に加算して削除してOK
     for(j = 0; j < nodes.length; j++){
-      if((excepts === '') || ((nodes[j].matches !== undefined) && (!nodes[j].matches(excepts)))){
+      if((excepts === '') || (!nodes[j].matches(excepts))){
         nodes[j].parentNode.removeChild(nodes[j]);
       }
     }
