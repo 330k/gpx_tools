@@ -16,9 +16,11 @@
  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css" />
 </head>
 <body>
+<fieldset>
  <label>GPXファイル(複数選択可): <input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
  <div id="gpx_filenames"></div>
- <br />
+</fieldset>
+<fieldset>
  <label><input type="checkbox" id="merge_gpx" checked="checked" />複数のGPXファイルの内容を1つにまとめる</label><br />
  <label><input type="checkbox" id="merge_trk" checked="checked" />複数のtrk要素を1つにまとめる</label><br />
  <label><input type="checkbox" id="merge_trkseg" checked="checked" />複数のtrkseg要素を1つにまとめる</label><br />
@@ -62,10 +64,12 @@
  <label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label><br />
  <label><input type="checkbox" id="delete_others" checked="checked" />ele要素とtime要素以外のtrkptの子要素を削除</label><br />
  <label><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label><br />
- <br />
+</fieldset>
+<fieldset>
  <button id="process_gpx">処理実行</button><br />
  <br />
  <div id="gpx_download"></div>
+</fieldset>
  <script type="text/javascript">
 /* globals google, $ */
 var parser = new DOMParser(),
