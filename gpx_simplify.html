@@ -652,13 +652,15 @@ function createGPXDownloadLink(gpxdocs, filenames){
     gpxtext = '',
     e = null,
     bb = null,
-    blob = null;
+    blob = null,
+    downloadname = '';
 
   for(i = 0; i < gpxdocs.length; i++){
     // カシミール向けに空要素を生成しない
     gpxtext = serializer.serializeToString(gpxdocs[i]).replace(/<trkpt(.*?)\/>/g, '<trkpt$1><\/trkpt>');
     e = document.createElement('a');
-      
+    downloadname = 'simplified_' + filenames[i];
+
     if(window.URL && window.URL.createObjectURL){
       try{
         blob = new Blob([gpxtext], {type:'application/xml'});
@@ -669,8 +671,8 @@ function createGPXDownloadLink(gpxdocs, filenames){
       }
       e.href = window.URL.createObjectURL(blob);
       e.setAttribute('target', '_blank');
-      e.setAttribute('download', filenames[i]);
-      e.appendChild(document.createTextNode('Download ' + filenames[i]));
+      e.setAttribute('download', downloadname);
+      e.appendChild(document.createTextNode('Download ' + downloadname));
 
       if(window.navigator.msSaveBlob){
         // IE, Edge
@@ -680,11 +682,11 @@ function createGPXDownloadLink(gpxdocs, filenames){
             evt.preventDefault();
             return false;
           });
-        })(blob, filenames[i]);
+        })(blob, downloadname);
       }
     }else{
       e.href = 'data:application/octet-stream,' + encodeURIComponent(gpxtext);
-      e.setAttribute('download', 'download.gpx');
+      e.setAttribute('download', downloadname);
       
       e.appendChild(document.createTextNode('Download GPX'));
     }
