@@ -21,10 +21,11 @@
  <div id="gpx_filenames"></div>
 </fieldset>
 <fieldset>
- <label><input type="checkbox" id="merge_gpx" checked="checked" />複数のGPXファイルの内容を1つにまとめる</label><br />
- <label><input type="checkbox" id="merge_trk" checked="checked" />複数のtrk要素を1つにまとめる</label><br />
- <label><input type="checkbox" id="merge_trkseg" checked="checked" />複数のtrkseg要素を1つにまとめる</label><br />
- <label>トラック(trkseg)の自動分割: <select id="split_trkseg">
+ <table>
+  <tr><td><label for="merge_gpx">複数のGPXファイルの内容を1つにまとめる</label></td><td><input type="checkbox" id="merge_gpx" checked="checked" /></td></tr>
+  <tr><td><label for="merge_trk">複数のtrk要素を1つにまとめる</label></td><td><input type="checkbox" id="merge_trk" checked="checked" /></td></tr>
+  <tr><td><label for="merge_trkseg">複数のtrkseg要素を1つにまとめる</label></td><td><input type="checkbox" id="merge_trkseg" checked="checked" /></td></tr>
+  <tr><td>トラック(trkseg)の自動分割:</td><td><select id="split_trkseg">
    <option value="0">自動分割なし</option>
    <option value="1">1時間途切れたら</option>
    <option value="2">2時間途切れたら</option>
@@ -34,36 +35,37 @@
    <option value="6" selected="selected">6時間途切れたら</option>
    <option value="12">12時間途切れたら</option>
    <option value="24">24時間途切れたら</option>
- </select></label><br />
- <label>トラック(trkseg)の間引き: <select id="reduce_points">
-  <option value="0">間引きなし</option>
-  <option value="100">100 points</option>
-  <option value="200">200 points</option>
-  <option value="400" selected="selected">400 points</option>
-  <option value="800">800 points</option>
-  <option value="2000">2000 points</option>
-  <option value="4000">4000 points</option>
-  <option value="8000">8000 points</option>
- </select></label><br />
- <label>緯度経度の精度: <select id="latlon_precision">
-  <option value="0">変更なし</option>
-  <option value="5">小数点以下5桁</option>
-  <option value="6" selected="selected">小数点以下6桁</option>
-  <option value="7">小数点以下7桁</option>
-  <option value="8">小数点以下8桁</option>
- </select></label><br />
- <label>高度(ele要素)の削除/精度/修正: <select id="ele_process">
-  <option value="null">変更なし</option>
-  <option value="delete">ele要素を削除</option>
-  <option value="toFixed_0">整数に丸める</option>
-  <option value="toFixed_1" selected="selected">小数点以下1桁</option>
-  <option value="toFixed_2">小数点以下2桁</option>
-  <option value="toFixed_3">小数点以下3桁</option>
-  <option value="google">Google Maps Elevations APIの標高に修正(100点/秒)</option>
- </select></label><br />
- <label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label><br />
- <label><input type="checkbox" id="delete_others" checked="checked" />ele要素とtime要素以外のtrkptの子要素を削除</label><br />
- <label><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label><br />
+   </select></td></tr>
+  <tr><td>トラック(trkseg)の間引き:</td><td><select id="reduce_points">
+   <option value="0">間引きなし</option>
+   <option value="100">100 points</option>
+   <option value="200">200 points</option>
+   <option value="400" selected="selected">400 points</option>
+   <option value="800">800 points</option>
+   <option value="2000">2000 points</option>
+   <option value="4000">4000 points</option>
+   <option value="8000">8000 points</option>
+   </select></td></tr>
+  <tr><td>緯度経度の精度:</td><td><select id="latlon_precision">
+   <option value="0">変更なし</option>
+   <option value="5">小数点以下5桁</option>
+   <option value="6" selected="selected">小数点以下6桁</option>
+   <option value="7">小数点以下7桁</option>
+   <option value="8">小数点以下8桁</option>
+   </select></td></tr>
+  <tr><td>高度(ele要素)の削除/精度/修正:</td><td><select id="ele_process">
+   <option value="null">変更なし</option>
+   <option value="delete">ele要素を削除</option>
+   <option value="toFixed_0">整数に丸める</option>
+   <option value="toFixed_1" selected="selected">小数点以下1桁</option>
+   <option value="toFixed_2">小数点以下2桁</option>
+   <option value="toFixed_3">小数点以下3桁</option>
+   <option value="google">Google Maps Elevations APIの標高に修正(100点/秒)</option>
+   </select></td></tr>
+  <tr><td><label for="delete_time">時刻(time要素)を削除</label></td><td><input type="checkbox" id="delete_time" /></td></tr>
+  <tr><td><label for="delete_others">ele要素とtime要素以外のtrkptの子要素を削除</label></td><td><input type="checkbox" id="delete_others" checked="checked" /></td></tr>
+  <tr><td><label for="delete_whitespaces">無駄な空白を削除</label></td><td><input type="checkbox" id="delete_whitespaces" checked="checked" /></td></tr>
+ </table>
 </fieldset>
 <fieldset>
  <button id="process_gpx">処理実行</button><br />
