@@ -25,7 +25,7 @@
   <tr><td><label for="merge_gpx">複数のGPXファイルの内容を1つにまとめる</label></td><td><input type="checkbox" id="merge_gpx" checked="checked" /></td></tr>
   <tr><td><label for="merge_trk">複数のtrk要素を1つにまとめる</label></td><td><input type="checkbox" id="merge_trk" checked="checked" /></td></tr>
   <tr><td><label for="merge_trkseg">複数のtrkseg要素を1つにまとめる</label></td><td><input type="checkbox" id="merge_trkseg" checked="checked" /></td></tr>
-  <tr><td>トラック(trkseg)の自動分割:</td><td><select id="split_trkseg">
+  <tr><td><label for="split_trkseg">トラック(trkseg)の自動分割</label></td><td><select id="split_trkseg">
    <option value="0">自動分割なし</option>
    <option value="1">1時間途切れたら</option>
    <option value="2">2時間途切れたら</option>
@@ -36,7 +36,7 @@
    <option value="12">12時間途切れたら</option>
    <option value="24">24時間途切れたら</option>
    </select></td></tr>
-  <tr><td>トラック(trkseg)の間引き:</td><td><select id="reduce_points">
+  <tr><td><label for="reduce_points">トラック(trkseg)の間引き</label></td><td><select id="reduce_points">
    <option value="0">間引きなし</option>
    <option value="100">100 points</option>
    <option value="200">200 points</option>
@@ -46,14 +46,14 @@
    <option value="4000">4000 points</option>
    <option value="8000">8000 points</option>
    </select></td></tr>
-  <tr><td>緯度経度の精度:</td><td><select id="latlon_precision">
+  <tr><td><label for="latlon_precision">緯度経度の精度</label></td><td><select id="latlon_precision">
    <option value="0">変更なし</option>
    <option value="5">小数点以下5桁</option>
    <option value="6" selected="selected">小数点以下6桁</option>
    <option value="7">小数点以下7桁</option>
    <option value="8">小数点以下8桁</option>
    </select></td></tr>
-  <tr><td>高度(ele要素)の削除/精度/修正:</td><td><select id="ele_process">
+  <tr><td><label for="ele_process">高度(ele要素)の削除/精度/修正</label></td><td><select id="ele_process">
    <option value="null">変更なし</option>
    <option value="delete">ele要素を削除</option>
    <option value="toFixed_0">整数に丸める</option>
