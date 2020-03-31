@@ -60,11 +60,15 @@
    <option value="toFixed_1" selected="selected">小数点以下1桁</option>
    <option value="toFixed_2">小数点以下2桁</option>
    <option value="toFixed_3">小数点以下3桁</option>
-   <option value="google">Google Maps Elevations APIの標高に修正(100点/秒)</option>
+   <option value="google">Google Mapsの標高に修正(100点/秒)</option>
    </select></td></tr>
   <tr><td><label for="delete_time">時刻(time要素)を削除</label></td><td><input type="checkbox" id="delete_time" /></td></tr>
   <tr><td><label for="delete_others">ele要素とtime要素以外のtrkptの子要素を削除</label></td><td><input type="checkbox" id="delete_others" checked="checked" /></td></tr>
   <tr><td><label for="delete_whitespaces">無駄な空白を削除</label></td><td><input type="checkbox" id="delete_whitespaces" checked="checked" /></td></tr>
+  <tr><td><label for="change_name">GPXファイル名</label></td><td><select id="change_name">
+   <option value="null" selected="selected">変更なし</option>
+   <option value="fromname">name要素から取得</option>
+   </select></td></tr>
  </table>
 </fieldset>
 <fieldset>
@@ -120,6 +124,7 @@ function readGPX(file, index){
 function processGPX(){
   'use strict';
   var xmldocs = [],
+    downloadnames = [],
     i = 0;
 
   try{
@@ -163,13 +168,19 @@ function processGPX(){
     if($('#delete_whitespaces').prop('checked') === true){
       deleteWhitespaces(xmldocs);
     }
+    if($('#change_name').val() === 'fromname'){
+      downloadnames = getGPXNames(xmldocs);
+    }else{
+      downloadnames = filenames;
+    }
+console.log(downloadnames);
 
     if($('#ele_process').val() === 'google'){
       addElevation(xmldocs, function(){
-        createGPXDownloadLink(xmldocs, filenames);
+        createGPXDownloadLink(xmldocs, downloadnames);
       });
     }else{
-      createGPXDownloadLink(xmldocs, filenames);
+      createGPXDownloadLink(xmldocs, downloadnames);
     }
   }catch(e){
     $('#gpx_download').html('Error: ' + e.message);
@@ -647,21 +658,36 @@ function addElevation(gpxdocs, callback){
   }
 }
 
+// 各GPXのname要素を取得して配列として返す
+function getGPXNames(gpxdocs){
+  'use strict';
+  var i = 0,
+    nodes = null,
+    result = [];
+
+  for(i = 0; i < gpxdocs.length; i++){
+    nodes = gpxdocs[i].querySelectorAll('name');
+    if(nodes.length > 0){
+      result[i] = nodes[0].textContent;
+    }
+  }
+
+  return result;
+}
+
 // GPXファイルのダウンロードリンクを作成
-function createGPXDownloadLink(gpxdocs, filenames){
+function createGPXDownloadLink(gpxdocs, downloadnames){
   'use strict';
   var i = 0,
     gpxtext = '',
     e = null,
     bb = null,
-    blob = null,
-    downloadname = '';
+    blob = null;
 
   for(i = 0; i < gpxdocs.length; i++){
     // カシミール向けに空要素を生成しない
     gpxtext = serializer.serializeToString(gpxdocs[i]).replace(/<trkpt(.*?)\/>/g, '<trkpt$1><\/trkpt>');
     e = document.createElement('a');
-    downloadname = 'simplified_' + filenames[i];
 
     if(window.URL && window.URL.createObjectURL){
       try{
@@ -673,8 +699,8 @@ function createGPXDownloadLink(gpxdocs, filenames){
       }
       e.href = window.URL.createObjectURL(blob);
       e.setAttribute('target', '_blank');
-      e.setAttribute('download', downloadname);
-      e.appendChild(document.createTextNode('Download ' + downloadname));
+      e.setAttribute('download', downloadnames[i]);
+      e.appendChild(document.createTextNode('Download ' + downloadnames[i]));
 
       if(window.navigator.msSaveBlob){
         // IE, Edge
@@ -684,11 +710,11 @@ function createGPXDownloadLink(gpxdocs, filenames){
             evt.preventDefault();
             return false;
           });
-        })(blob, downloadname);
+        })(blob, downloadnames[i]);
       }
     }else{
       e.href = 'data:application/octet-stream,' + encodeURIComponent(gpxtext);
-      e.setAttribute('download', downloadname);
+      e.setAttribute('download', downloadnames[i]);
       
       e.appendChild(document.createTextNode('Download GPX'));
     }
