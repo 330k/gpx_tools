@@ -67,6 +67,8 @@
   <tr><td><label for="delete_whitespaces">無駄な空白を削除</label></td><td><input type="checkbox" id="delete_whitespaces" checked="checked" /></td></tr>
   <tr><td><label for="change_name">GPXファイル名</label></td><td><select id="change_name">
    <option value="null" selected="selected">変更なし</option>
+   <option value="prefix_simplified">前に「simplified_」を付加</option>
+   <option value="suffix_simplified">後に「_simplified」を付加</option>
    <option value="fromname">name要素から取得</option>
    </select></td></tr>
  </table>
@@ -169,7 +171,11 @@ function processGPX(){
       deleteWhitespaces(xmldocs);
     }
     if($('#change_name').val() === 'fromname'){
-      downloadnames = getGPXNames(xmldocs);
+      downloadnames = getGPXNames(xmldocs).map((x) => x + '.gpx');
+    }else if($('#change_name').val() === 'prefix_simplified'){
+      downloadnames = filenames.map((x) => 'simplified_' + x);
+    }else if($('#change_name').val() === 'suffix_simplified'){
+      downloadnames = filenames.map((x) => x.replace(/\.gpx/i, "_simplified.gpx"));
     }else{
       downloadnames = filenames;
     }
