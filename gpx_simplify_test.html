@@ -18,8 +18,13 @@
 </head>
 <body>
 <fieldset>
+ <legend>対象ファイル</legend>
+ <label>GPXファイル(複数選択可): <input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
+ <div id="gpx_filenames"></div>
+</fieldset>
+<fieldset>
+ <legend>処理内容</legend>
  <table>
-  <tr><td><label>GPXファイル(複数選択可):</td><td><input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br /><div id="gpx_filenames"></div></td></tr>
   <tr><td><label for="merge_gpx">複数のGPXファイルの内容を1つにまとめる</label></td><td><input type="checkbox" id="merge_gpx" checked="checked" /></td></tr>
   <tr><td><label for="merge_trk">複数のtrk要素を1つにまとめる</label></td><td><input type="checkbox" id="merge_trk" checked="checked" /></td></tr>
   <tr><td><label for="merge_trkseg">複数のtrkseg要素を1つにまとめる</label></td><td><input type="checkbox" id="merge_trkseg" checked="checked" /></td></tr>
@@ -72,6 +77,7 @@
  </table>
 </fieldset>
 <fieldset>
+ <legend>処理結果</legend>
  <button id="process_gpx">処理実行</button><br />
  <br />
  <div id="gpx_download"></div>
