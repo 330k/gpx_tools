@@ -18,10 +18,12 @@
 </head>
 <body>
 <fieldset>
- <label>GPXファイル(複数選択可): <input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
+ <legend>対象GPXファイル(複数選択可)</legend>
+ <input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
  <div id="gpx_filenames"></div>
 </fieldset>
 <fieldset>
+ <legend>処理内容</legend>
  <table>
   <tr><td><label for="merge_gpx">複数のGPXファイルの内容を1つにまとめる</label></td><td><input type="checkbox" id="merge_gpx" checked="checked" /></td></tr>
   <tr><td><label for="merge_trk">複数のtrk要素を1つにまとめる</label></td><td><input type="checkbox" id="merge_trk" checked="checked" /></td></tr>
@@ -75,6 +77,7 @@
  </table>
 </fieldset>
 <fieldset>
+ <legend>処理結果</legend>
  <button id="process_gpx">処理実行</button><br />
  <br />
  <div id="gpx_download"></div>
@@ -93,6 +96,19 @@ $('select').selectmenu();
 $('button').button();*/
 $('#gpx_files').on('change', selectGPXFile);
 $('#process_gpx').on('click', processGPX);
+(function(){
+  try{
+    let options = JSON.parse(localStorage.getItem('previousoptions'));
+    
+    for(let p in options.checkbox){
+	  document.getElementById(p).checked = options.checkbox[p];
+    }
+    for(let p in options.select){
+      document.getElementById(p).value = options.select[p];
+    }
+  }catch(e){
+  }
+})();
 
 // GPXファイル読み込み
 function selectGPXFile(evt){
@@ -189,6 +205,19 @@ console.log(downloadnames);
     }else{
       createGPXDownloadLink(xmldocs, downloadnames);
     }
+    
+    // 現在の設定をlocalStorageに保存
+    let options = {};
+    options.checkbox = {};
+    for(i of document.querySelectorAll('input[type="checkbox"]')){
+      options.checkbox[i.id] = i.checked;
+    }
+    options.select = {};
+    for(i of document.querySelectorAll('select')){
+      options.select[i.id] = i.value;
+    }
+    localStorage.setItem('previousoptions', JSON.stringify(options));
+    
   }catch(e){
     $('#gpx_download').html('Error: ' + e.message);
   }
