@@ -593,8 +593,6 @@ function addElevation(gpxdocs){
   return new Promise(function(resolve, reject){
     const UNIT = 100;
     const WAIT = 1000;
-    const locations = [];
-    const trkptArrs = [];
     let count = 0;
     let total = 0;
     
@@ -607,6 +605,8 @@ function addElevation(gpxdocs){
       let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
       total += trkpts.length;
       for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
+        let locations = [];
+        let trkptArrs = [];
         for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
           locations.push(new google.maps.LatLng(
             trkpts[k].getAttribute("lat"),
@@ -631,6 +631,8 @@ function addElevation(gpxdocs){
               
               trkpts[i].appendChild(ele);
             }
+          }else{
+            reject();
           }
           count += locations.length;
           
