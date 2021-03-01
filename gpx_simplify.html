@@ -122,6 +122,9 @@ function selectGPXFile(evt){
     for(i = 0; i < files.length; i++){
       readGPX(files[i], i);
     }
+    // 親ウィンドウにサイズ変更を通知
+    notifyResize();
+    
   }catch(err){
     alert('ブラウザが対応していません');
   }
