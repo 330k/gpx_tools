@@ -780,7 +780,7 @@ function notifyResize(e){
     target.postMessage('{"message":"resize", "height":' + document.body.scrollHeight + '}', '*');
   }
 }
-window.addEventListener('load', notifyResize);
+window.addEventListener('load', setTimeout(notifyResize, 50));
  </script>
 
 </body>
