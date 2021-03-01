@@ -104,6 +104,9 @@ const filenames = [];
     }
   }catch(e){
   }
+  window.addEventListener("load", function(){
+    setTimeout(notifyResize, 50);
+  });
 }
 
 /**
@@ -210,10 +213,14 @@ console.log(downloadnames);
 
     if(document.getElementById("ele_process").value === "google"){
       addElevation(xmldocs).then(function(){
-        createGPXDownloadLink(xmldocs, downloadnames)
+        createGPXDownloadLink(xmldocs, downloadnames);
+        // 親ウィンドウにサイズ変更を通知
+        notifyResize();
       });
     }else{
       createGPXDownloadLink(xmldocs, downloadnames);
+      // 親ウィンドウにサイズ変更を通知
+      notifyResize();
     }
     
     // 現在の設定をlocalStorageに保存
@@ -229,9 +236,6 @@ console.log(downloadnames);
       }
       localStorage.setItem("previousoptions", JSON.stringify(options));
     }
-    
-    // 親ウィンドウにサイズ変更を通知
-    notifyResize();
     
   }catch(e){
     document.getElementById("gpx_download").innerText = "Error: " + e.message;
@@ -729,9 +733,6 @@ function notifyResize(){
     target.postMessage('{"message":"resize", "height":' + document.body.scrollHeight + "}", "*");
   }
 }
-window.addEventListener("load", function(){
-  setTimeout(notifyResize, 50);
-});
  </script>
 
 </body>
