@@ -728,7 +728,7 @@ function progressMessage(message){
  * iframeで埋め込まれたときに親ウィンドウに自身の高さ情報を渡し、リサイズを要求
  */
 function notifyResize(){
-  var target = parent.postMessage ? parent : (parent.document.postMessage ? parent.document : undefined);
+  const target = parent.postMessage ? parent : (parent.document.postMessage ? parent.document : undefined);
   if (typeof target !== "undefined") {
     target.postMessage('{"message":"resize", "height":' + document.body.scrollHeight + "}", "*");
   }
