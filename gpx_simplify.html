@@ -118,9 +118,10 @@ function selectGPXFile(evt){
     filenames.length = 0;
     document.getElementById("gpx_filenames").innerText = "";
     
-    Promise.all(Array.from(files).map((e, i) => readGPX(e, i)));
-    // 親ウィンドウにサイズ変更を通知
-    notifyResize();
+    Promise.all(Array.from(files).map((e, i) => readGPX(e, i))).then(function(){
+      // 親ウィンドウにサイズ変更を通知
+      notifyResize();
+    });
     
   }catch(err){
     //alert("ブラウザが対応していません");
