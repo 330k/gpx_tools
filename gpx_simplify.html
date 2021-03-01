@@ -218,6 +218,9 @@ console.log(downloadnames);
     }
     localStorage.setItem('previousoptions', JSON.stringify(options));
     
+    // 親ウィンドウにサイズ変更を通知
+    notifyResize();
+    
   }catch(e){
     $('#gpx_download').html('Error: ' + e.message);
   }
@@ -765,13 +768,14 @@ function progressMessage(message){
   document.getElementById('gpx_download').textContent = message;
 }
 
-// iframeで埋め込まれたときに親ウィンドウに自身の高さ情報を渡す
-window.addEventListener('DOMContentLoaded', function(e){
+// iframeで埋め込まれたときに親ウィンドウに自身の高さ情報を渡し、リサイズを要求
+function notifyResize(e)
   var target = parent.postMessage ? parent : (parent.document.postMessage ? parent.document : undefined);
   if (typeof target !== "undefined") {
-    target.postMessage('{"height":' + document.body.scrollHeight + '}', '*');
+    target.postMessage('{"message":"resize", "height":' + document.body.scrollHeight + '}', '*');
   }
-});
+}
+window.addEventListener('DOMContentLoaded', notifyResize);
  </script>
 
 </body>
