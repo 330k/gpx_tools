@@ -596,20 +596,16 @@ function addElevation(gpxdocs){
     const trkptArrs = [];
     let count = 0;
     let total = 0;
-    let c = 0;
     
     for(const gpxdoc of gpxdocs){
-      let ele = gpxdoc.querySelectorAll("ele");
-      for(let j = 0; j < ele.length; j++){
-        ele[j].parentNode.removeChild(ele[j]);
+      let eles = gpxdoc.querySelectorAll("ele");
+      for(const ele of eles){
+        ele.parentNode.removeChild(ele);
       }
       
       let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
       total += trkpts.length;
-      for(let j = 0; j < trkpts.length; j += UNIT){
-        locations = [];
-        trkptArrs = [];
-        
+      for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
         for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
           locations.push(new google.maps.LatLng(
             trkpts[k].getAttribute("lat"),
@@ -618,7 +614,6 @@ function addElevation(gpxdocs){
           trkptArrs.push(trkpts[k]);
         }
         getElevation(gpxdoc, trkptArrs, locations, c * WAIT);
-        c++;
       }
     }
 
@@ -730,7 +725,9 @@ function notifyResize(){
     target.postMessage('{"message":"resize", "height":' + document.body.scrollHeight + "}", "*");
   }
 }
-window.addEventListener("load", function(){ setTimeout(notifyResize, 50) });
+window.addEventListener("load", function(){
+  setTimeout(notifyResize, 50);
+});
  </script>
 
 </body>
