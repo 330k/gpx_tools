@@ -119,11 +119,13 @@ function selectGPXFile(evt){
     
     xmltexts = [];
     filenames = [];
+    $('#gpx_filenames').html("");
+    
     for(i = 0; i < files.length; i++){
       readGPX(files[i], i);
     }
     // 親ウィンドウにサイズ変更を通知
-    notifyResize();
+    setTimeout(notifyResize, 50);
     
   }catch(err){
     alert('ブラウザが対応していません');
