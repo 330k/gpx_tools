@@ -97,7 +97,7 @@ const filenames = [];
     const options = JSON.parse(localStorage.getItem("previousoptions"));
     
     for(let p in options.checkbox){
-	  document.getElementById(p).checked = options.checkbox[p];
+      document.getElementById(p).checked = options.checkbox[p];
     }
     for(let p in options.select){
       document.getElementById(p).value = options.select[p];
@@ -587,10 +587,11 @@ function deleteWhitespaces(gpxdocs){
 /**
  * 標高をGoogle Elevations APIから取得
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
+ * @return {Promise}
  */
 function addElevation(gpxdocs){
   return new Promise(function(resolve, reject){
-	  const UNIT = 100;
+    const UNIT = 100;
     const WAIT = 1000;
     const locations = [];
     const trkptArrs = [];
