@@ -718,6 +718,7 @@ function createGPXDownloadLink(gpxdocs, downloadnames){
  */
 function progressMessage(message){
   document.getElementById("gpx_download").textContent = message;
+  notifyResize();
 }
 
 /**
