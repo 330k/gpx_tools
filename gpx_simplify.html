@@ -13,14 +13,16 @@
  <script type="text/javascript" src="https://maps.google.com/maps/api/js?key=AIzaSyCir56M7J9LT4-3wDVgG8etGo_HPSMWVBk"></script>
  <style>
 html, body { margin: 0; padding: 0; font-size: 16px; }
+#wrapper { width: 100%; max-width: 480px; }
 fieldset { border-radius: 5px; }
 ul { margin: 0; padding: 0; }
 ul li { list-style-type: none; margin: 0 auto 5px 0; padding-left: 20px; border-bottom: 1px dotted #ccc;}
 ul li input[type=checkbox] { position: absolute; width: 15px; left: 15px; }
-ul li select { width: 240px; }
+ul li select { width: 100%; max-width: 240px; }
  </style>
 </head>
 <body>
+<div id="wrapper">
 <fieldset>
  <legend>対象GPXファイル(複数選択可)</legend>
  <input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
@@ -96,6 +98,7 @@ ul li select { width: 240px; }
  <br />
  <div id="gpx_download"></div>
 </fieldset>
+</div>
  <script type="text/javascript">
 /* globals google */
 const parser = new DOMParser();
