@@ -189,12 +189,16 @@ async function processGPX(){
     if(document.getElementById("ele_process").value.match(/toFixed_(\d+)/)){
       setPrecisionEle(xmldocs, document.getElementById("ele_process").value.match(/toFixed_(\d+)/)[1] - 0);
     }
+    if(document.getElementById("ele_process").value === "google"){
+      await addElevation(xmldocs);
+    }
     if(document.getElementById("delete_time").checked === true){
       deleteElements(xmldocs, "trkpt > time, rtept > time, wpt > time", "");
     }
     if(document.getElementById("delete_others").checked === true){
       deleteElements(xmldocs, "trkpt > *, rtept > *, wpt > *", "ele, time");
     }
+    
     if(document.getElementById("delete_whitespaces").checked === true){
       deleteWhitespaces(xmldocs);
     }
@@ -211,10 +215,6 @@ async function processGPX(){
     }
 console.log(downloadnames);
 
-    if(document.getElementById("ele_process").value === "google"){
-      await addElevation(xmldocs);
-    }
-    
     createGPXDownloadLink(xmldocs, downloadnames);
     
     // 親ウィンドウにサイズ変更を通知
@@ -611,20 +611,19 @@ function addElevation(gpxdocs){
       let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
       total += trkpts.length;
       for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
-        let locations = [];
         let trkptArrs = [];
         for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
-          locations.push(new google.maps.LatLng(
-            trkpts[k].getAttribute("lat"),
-            trkpts[k].getAttribute("lon")
-          ));
           trkptArrs.push(trkpts[k]);
         }
-        getElevation(gpxdoc, trkptArrs, locations, c * WAIT);
+        getElevation(gpxdoc, trkptArrs, c * WAIT);
       }
     }
 
-    function getElevation(gpxdoc, trkpts, locations, wait){
+    function getElevation(gpxdoc, trkpts, wait){
+      const locations = trkpts.map((trkpt) => (new google.maps.LatLng(
+        trkpt.getAttribute("lat"),
+        trkpt.getAttribute("lon")
+      )));
       setTimeout(function(){
         elevationService.getElevationForLocations({
           locations: locations
@@ -678,7 +677,6 @@ function createGPXDownloadLink(gpxdocs, downloadnames){
   for(let i = 0; i < gpxdocs.length; i++){
     // カシミール向けに空要素を生成しない
     let gpxdoc = gpxdocs[i];
-    gpxdoc.normalize();
     let gpxtext = serializer.serializeToString(gpxdoc).replace(/<trkpt(.*?)\/>/g, "<trkpt$1><\/trkpt>");
     let e = document.createElement("a");
 
