@@ -611,7 +611,7 @@ function addElevation(gpxdocs){
       let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
       total += trkpts.length;
       for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
-        getElevation(gpxdoc, trkpts.slice(j, Math.max(j + UNIT, trkpts.length), c * WAIT);
+        getElevation(gpxdoc, trkpts.slice(j, Math.max(j + UNIT, trkpts.length)), c * WAIT);
       }
     }
 
