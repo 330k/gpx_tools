@@ -212,7 +212,7 @@ async function processGPX(){
 console.log(downloadnames);
 
     if(document.getElementById("ele_process").value === "google"){
-      addElevation(xmldocs);
+      await addElevation(xmldocs);
     }
     
     createGPXDownloadLink(xmldocs, downloadnames);
@@ -591,38 +591,40 @@ function deleteWhitespaces(gpxdocs){
 /**
  * 標高をGoogle Elevations APIから取得
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
+ * @return {Promise}
  */
 function addElevation(gpxdocs){
   const elevationService = new google.maps.ElevationService();
-  const UNIT = 100;
-  const WAIT = 1000;
-  let count = 0;
-  let total = 0;
   
-  for(const gpxdoc of gpxdocs){
-    let eles = gpxdoc.querySelectorAll("ele");
-    for(const ele of eles){
-      ele.parentNode.removeChild(ele);
-    }
+  return new Promise(function(resolve, reject){
+    const UNIT = 100;
+    const WAIT = 1000;
+    let count = 0;
+    let total = 0;
     
-    let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
-    total += trkpts.length;
-    for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
-      let locations = [];
-      let trkptArrs = [];
-      for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
-        locations.push(new google.maps.LatLng(
-          trkpts[k].getAttribute("lat"),
-          trkpts[k].getAttribute("lon")
-        ));
-        trkptArrs.push(trkpts[k]);
+    for(const gpxdoc of gpxdocs){
+      let eles = gpxdoc.querySelectorAll("ele");
+      for(const ele of eles){
+        ele.parentNode.removeChild(ele);
       }
-      await getElevation(gpxdoc, trkptArrs, locations, WAIT);
+      
+      let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
+      total += trkpts.length;
+      for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
+        let locations = [];
+        let trkptArrs = [];
+        for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
+          locations.push(new google.maps.LatLng(
+            trkpts[k].getAttribute("lat"),
+            trkpts[k].getAttribute("lon")
+          ));
+          trkptArrs.push(trkpts[k]);
+        }
+        getElevation(gpxdoc, trkptArrs, locations, c * WAIT);
+      }
     }
-  }
 
-  function getElevation(gpxdoc, trkpts, locations, wait){
-    return new Promise(function(resolve, reject){
+    function getElevation(gpxdoc, trkpts, locations, wait){
       setTimeout(function(){
         elevationService.getElevationForLocations({
           locations: locations
@@ -649,8 +651,8 @@ function addElevation(gpxdocs){
           }
         });
       }, wait);
-    });
-  };
+    }
+  });
 }
 
 /**
