@@ -608,10 +608,10 @@ function addElevation(gpxdocs){
         ele.parentNode.removeChild(ele);
       }
       
-      let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
-      total += trkpts.length;
-      for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
-        getElevation(gpxdoc, Array.from(trkpts).slice(j, Math.min(j + UNIT, trkpts.length)), c * WAIT);
+      let trkpts_array = Array.from(gpxdoc.querySelectorAll("trkpt, rtept, wpt"));
+      total += trkpts_array.length;
+      for(let j = 0, c = 0; j < trkpts_array.length; j += UNIT, c++){
+        getElevation(gpxdoc, trkpts_array.slice(j, j + UNIT), c * WAIT);
       }
     }
 
