@@ -611,11 +611,7 @@ function addElevation(gpxdocs){
       let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
       total += trkpts.length;
       for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
-        let trkptArrs = [];
-        for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
-          trkptArrs.push(trkpts[k]);
-        }
-        getElevation(gpxdoc, trkptArrs, c * WAIT);
+        getElevation(gpxdoc, trkpts.slice(j, Math.max(j + UNIT, trkpts.length), c * WAIT);
       }
     }
 
@@ -678,7 +674,7 @@ function createGPXDownloadLink(gpxdocs, downloadnames){
     // カシミール向けに空要素を生成しない
     let gpxdoc = gpxdocs[i];
     let gpxtext = serializer.serializeToString(gpxdoc).replace(/<trkpt(.*?)\/>/g, "<trkpt$1><\/trkpt>");
-    let e = document.createElement("a");
+    const e = document.createElement("a");
 
     if(window.URL && window.URL.createObjectURL){
       let blob;
