@@ -212,7 +212,7 @@ async function processGPX(){
 console.log(downloadnames);
 
     if(document.getElementById("ele_process").value === "google"){
-      await addElevation(xmldocs);
+      addElevation(xmldocs);
     }
     
     createGPXDownloadLink(xmldocs, downloadnames);
@@ -591,9 +591,8 @@ function deleteWhitespaces(gpxdocs){
 /**
  * 標高をGoogle Elevations APIから取得
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
- * @return {Promise}
  */
-async function addElevation(gpxdocs){
+function addElevation(gpxdocs){
   const elevationService = new google.maps.ElevationService();
   const UNIT = 100;
   const WAIT = 1000;
