@@ -13,11 +13,11 @@
  <script type="text/javascript" src="https://maps.google.com/maps/api/js?key=AIzaSyCir56M7J9LT4-3wDVgG8etGo_HPSMWVBk"></script>
  <style>
 html, body { margin: 0; padding: 0; font-size: 16px; }
-dl { float: left; }
-dt { clear: both; float: left; width: 360px; }
-dd { float: left; width: 240px; }
-dd select { width: 100%; }
-dd input { margin-left: 0;}
+fieldset { border-radius: 5px; }
+ul { margin: 0; padding: 0; }
+ul li { list-style-type: none; margin: 0 auto 5px 0; padding-left: 20px; border-bottom: 1px dotted #ccc;}
+ul li input[type=checkbox] { position: absolute; width: 15px; left: 15px; }
+ul li select { width: 240px; }
  </style>
 </head>
 <body>
@@ -28,68 +28,67 @@ dd input { margin-left: 0;}
 </fieldset>
 <fieldset>
  <legend>処理内容</legend>
- <dl>
-  <dt><label for="merge_gpx">複数のGPXファイルの内容を1つにまとめる</label></dt>
-  <dd><input type="checkbox" id="merge_gpx" checked="checked" /></dd>
-  <dt><label for="merge_trk">複数のtrk要素を1つにまとめる</label></dt>
-  <dd><input type="checkbox" id="merge_trk" checked="checked" /></dd>
-  <dt><label for="merge_trkseg">複数のtrkseg要素を1つにまとめる</label></dt>
-  <dd><input type="checkbox" id="merge_trkseg" checked="checked" /></dd>
-  <dt><label for="split_trkseg">トラック(trkseg)の自動分割</label></dt>
-  <dd><select id="split_trkseg">
-   <option value="0">自動分割なし</option>
-   <option value="1">1時間途切れたら</option>
-   <option value="2">2時間途切れたら</option>
-   <option value="3">3時間途切れたら</option>
-   <option value="4">4時間途切れたら</option>
-   <option value="5">5時間途切れたら</option>
-   <option value="6" selected="selected">6時間途切れたら</option>
-   <option value="12">12時間途切れたら</option>
-   <option value="24">24時間途切れたら</option>
-  </select></dd>
-  <dt><label for="reduce_points">トラック(trkseg)の間引き</label></dt>
-  <dd><select id="reduce_points">
-   <option value="0">間引きなし</option>
-   <option value="100">100 points</option>
-   <option value="200">200 points</option>
-   <option value="400" selected="selected">400 points</option>
-   <option value="800">800 points</option>
-   <option value="2000">2000 points</option>
-   <option value="4000">4000 points</option>
-   <option value="8000">8000 points</option>
-  </select></dd>
-  <dt><label for="latlon_precision">緯度経度の精度</label></dt>
-  <dd><select id="latlon_precision">
-   <option value="0">変更なし</option>
-   <option value="5">小数点以下5桁</option>
-   <option value="6" selected="selected">小数点以下6桁</option>
-   <option value="7">小数点以下7桁</option>
-   <option value="8">小数点以下8桁</option>
-  </select></dd>
-  <dt><label for="ele_process">高度(ele要素)の削除/精度/修正</label></dt>
-  <dd><select id="ele_process">
-   <option value="null">変更なし</option>
-   <option value="delete">ele要素を削除</option>
-   <option value="toFixed_0">整数に丸める</option>
-   <option value="toFixed_1" selected="selected">小数点以下1桁</option>
-   <option value="toFixed_2">小数点以下2桁</option>
-   <option value="toFixed_3">小数点以下3桁</option>
-   <option value="google">Google Mapsの標高に修正(100点/秒)</option>
-  </select></dd>
-  <dt><label for="delete_time">時刻(time要素)を削除</label></dt>
-  <dd><input type="checkbox" id="delete_time" /></dd>
-  <dt><label for="delete_others">ele要素とtime要素以外のtrkptの子要素を削除</label></dt>
-  <dd><input type="checkbox" id="delete_others" checked="checked" /></dd>
-  <dt><label for="delete_whitespaces">無駄な空白を削除</label></dt>
-  <dd><input type="checkbox" id="delete_whitespaces" checked="checked" /></dd>
-  <dt><label for="change_name">GPXファイル名</label></dt>
-  <dd><select id="change_name">
-   <option value="null" selected="selected">変更なし</option>
-   <option value="prefix_simplified">前に「simplified_」を付加</option>
-   <option value="suffix_simplified">後に「_simplified」を付加</option>
-   <option value="fromname">name要素から取得</option>
-  </select></dd>
- </dl>
+ <ul>
+  <li><label><input type="checkbox" id="merge_gpx" checked="checked" />複数のGPXファイルの内容を1つにまとめる</label></li>
+  <li><label><input type="checkbox" id="merge_trk" checked="checked" />複数のtrk要素を1つにまとめる</label></li>
+  <li><label><input type="checkbox" id="merge_trkseg" checked="checked" />複数のtrkseg要素を1つにまとめる</label></li>
+  <li>トラック(trkseg)の自動分割<br />
+    <select id="split_trkseg">
+    <option value="0">自動分割なし</option>
+    <option value="1">1時間途切れたら</option>
+    <option value="2">2時間途切れたら</option>
+    <option value="3">3時間途切れたら</option>
+    <option value="4">4時間途切れたら</option>
+    <option value="5">5時間途切れたら</option>
+    <option value="6" selected="selected">6時間途切れたら</option>
+    <option value="12">12時間途切れたら</option>
+    <option value="24">24時間途切れたら</option>
+   </select>
+  </li>
+  <li>トラック(trkseg)の間引き<br />
+   <select id="reduce_points">
+    <option value="0">間引きなし</option>
+    <option value="100">100 points</option>
+    <option value="200">200 points</option>
+    <option value="400" selected="selected">400 points</option>
+    <option value="800">800 points</option>
+    <option value="2000">2000 points</option>
+    <option value="4000">4000 points</option>
+    <option value="8000">8000 points</option>
+   </select>
+  </li>
+  <li>緯度経度の精度<br />
+   <select id="latlon_precision">
+    <option value="0">変更なし</option>
+    <option value="5">小数点以下5桁</option>
+    <option value="6" selected="selected">小数点以下6桁</option>
+    <option value="7">小数点以下7桁</option>
+    <option value="8">小数点以下8桁</option>
+   </select>
+  </li>
+  <li>高度(ele要素)の削除/精度/修正<br />
+   <select id="ele_process">
+    <option value="null">変更なし</option>
+    <option value="delete">ele要素を削除</option>
+    <option value="toFixed_0">整数に丸める</option>
+    <option value="toFixed_1" selected="selected">小数点以下1桁</option>
+    <option value="toFixed_2">小数点以下2桁</option>
+    <option value="toFixed_3">小数点以下3桁</option>
+    <option value="google">Google Mapsの標高に修正(100点/秒)</option>
+   </select>
+  </li>
+  <li><label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label></li>
+  <li><label><input type="checkbox" id="delete_others" checked="checked" />ele要素とtime要素以外のtrkptの子要素を削除</label></li>
+  <li><label><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label></li>
+  <li><label>GPXファイル名<br />
+   <select id="change_name">
+    <option value="null" selected="selected">変更なし</option>
+    <option value="prefix_simplified">前に「simplified_」を付加</option>
+    <option value="suffix_simplified">後に「_simplified」を付加</option>
+    <option value="fromname">name要素から取得</option>
+  </select>
+ </li>
+ </ul>
 </fieldset>
 <fieldset>
  <legend>処理結果</legend>
