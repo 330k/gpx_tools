@@ -85,7 +85,6 @@
 /* globals google */
 const parser = new DOMParser();
 const serializer = new XMLSerializer();
-const elevationService = new google.maps.ElevationService();
 const xmltexts = [];
 const filenames = [];
 
@@ -113,7 +112,7 @@ const filenames = [];
  * GPXファイル選択イベントハンドラ
  * @param evt イベントオブジェクト
  */
-function selectGPXFile(evt){
+async function selectGPXFile(evt){
   try{
     const files = evt.target.files;
     
@@ -121,10 +120,10 @@ function selectGPXFile(evt){
     filenames.length = 0;
     document.getElementById("gpx_filenames").innerText = "";
     
-    Promise.all(Array.from(files).map((e, i) => readGPX(e, i))).then(function(){
-      // 親ウィンドウにサイズ変更を通知
-      notifyResize();
-    });
+    await Promise.all(Array.from(files).map((e, i) => readGPX(e, i)));
+
+    // 親ウィンドウにサイズ変更を通知
+    notifyResize();
     
   }catch(err){
     //alert("ブラウザが対応していません");
@@ -145,7 +144,7 @@ function readGPX(file, index){
       reader.onload = function(){
         xmltexts[index] = reader.result;
         filenames[index] = file.name;
-        document.getElementById("gpx_filenames").innerText = filenames.join(",");
+        document.getElementById("gpx_filenames").innerText = filenames.join(", ");
         
         resolve();
       };
@@ -159,9 +158,10 @@ function readGPX(file, index){
 /**
  * 処理実行ボタンイベントハンドラ
  */
-function processGPX(){
+async function processGPX(){
   try{
     document.getElementById("gpx_download").innerText = "";
+    document.getElementById("process_gpx").disabled = true;
     
     const xmldocs = xmltexts.map((e, i) => parser.parseFromString(e, "text/xml"));
 
@@ -212,16 +212,13 @@ function processGPX(){
 console.log(downloadnames);
 
     if(document.getElementById("ele_process").value === "google"){
-      addElevation(xmldocs).then(function(){
-        createGPXDownloadLink(xmldocs, downloadnames);
-        // 親ウィンドウにサイズ変更を通知
-        notifyResize();
-      });
-    }else{
-      createGPXDownloadLink(xmldocs, downloadnames);
-      // 親ウィンドウにサイズ変更を通知
-      notifyResize();
+      await addElevation(xmldocs);
     }
+    
+    createGPXDownloadLink(xmldocs, downloadnames);
+    
+    // 親ウィンドウにサイズ変更を通知
+    notifyResize();
     
     // 現在の設定をlocalStorageに保存
     {
@@ -239,6 +236,8 @@ console.log(downloadnames);
     
   }catch(e){
     document.getElementById("gpx_download").innerText = "Error: " + e.message;
+  }finally{
+    document.getElementById("process_gpx").disabled = false;
   }
 }
 
@@ -594,36 +593,37 @@ function deleteWhitespaces(gpxdocs){
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
  * @return {Promise}
  */
-function addElevation(gpxdocs){
-  return new Promise(function(resolve, reject){
-    const UNIT = 100;
-    const WAIT = 1000;
-    let count = 0;
-    let total = 0;
-    
-    for(const gpxdoc of gpxdocs){
-      let eles = gpxdoc.querySelectorAll("ele");
-      for(const ele of eles){
-        ele.parentNode.removeChild(ele);
-      }
-      
-      let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
-      total += trkpts.length;
-      for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
-        let locations = [];
-        let trkptArrs = [];
-        for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
-          locations.push(new google.maps.LatLng(
-            trkpts[k].getAttribute("lat"),
-            trkpts[k].getAttribute("lon")
-          ));
-          trkptArrs.push(trkpts[k]);
-        }
-        getElevation(gpxdoc, trkptArrs, locations, c * WAIT);
-      }
+async function addElevation(gpxdocs){
+  const elevationService = new google.maps.ElevationService();
+  const UNIT = 100;
+  const WAIT = 1000;
+  let count = 0;
+  let total = 0;
+  
+  for(const gpxdoc of gpxdocs){
+    let eles = gpxdoc.querySelectorAll("ele");
+    for(const ele of eles){
+      ele.parentNode.removeChild(ele);
     }
+    
+    let trkpts = gpxdoc.querySelectorAll("trkpt, rtept, wpt");
+    total += trkpts.length;
+    for(let j = 0, c = 0; j < trkpts.length; j += UNIT, c++){
+      let locations = [];
+      let trkptArrs = [];
+      for(let k = j; (k < j + UNIT) && (k < trkpts.length); k++){
+        locations.push(new google.maps.LatLng(
+          trkpts[k].getAttribute("lat"),
+          trkpts[k].getAttribute("lon")
+        ));
+        trkptArrs.push(trkpts[k]);
+      }
+      await getElevation(gpxdoc, trkptArrs, locations, WAIT);
+    }
+  }
 
-    function getElevation(gpxdoc, trkpts, locations, wait){
+  function getElevation(gpxdoc, trkpts, locations, wait){
+    return new Promise(function(resolve, reject){
       setTimeout(function(){
         elevationService.getElevationForLocations({
           locations: locations
@@ -650,8 +650,8 @@ function addElevation(gpxdocs){
           }
         });
       }, wait);
-    }
-  });
+    });
+  };
 }
 
 /**
@@ -730,7 +730,10 @@ function progressMessage(message){
 function notifyResize(){
   const target = parent.postMessage ? parent : (parent.document.postMessage ? parent.document : undefined);
   if (typeof target !== "undefined") {
-    target.postMessage('{"message":"resize", "height":' + document.body.scrollHeight + "}", "*");
+    target.postMessage(JSON.stringify({
+      "message": "resize",
+      "height": document.body.scrollHeight
+    }), "*");
   }
 }
  </script>
