@@ -387,7 +387,7 @@ function reducePoints(gpxdocs, reducedPoints){
     for(let i = 0; i < trkpts.length; i++){
       pts[i] = [
         (trkpts[i].getAttribute("lon") - 0) * degree,
-        Math.log(Math.abs(Math.tan(quadpi + 0.5 * (trkpts[i].getAttribute("lat") - 0) * degree)))
+        Math.asinh(Math.tanh((trkpts[i].getAttribute("lat") - 0) * degree))
       ];
       flag[i] = true;
     }
