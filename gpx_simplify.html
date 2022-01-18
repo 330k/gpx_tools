@@ -77,6 +77,7 @@ ul li select { width: 100%; max-width: 240px; }
     <option value="toFixed_2">小数点以下2桁</option>
     <option value="toFixed_3">小数点以下3桁</option>
     <option value="google">Google Mapsの標高に修正(100点/秒)</option>
+    <option value="gsi">国土地理院APIの標高に修正</option>
    </select>
   </li>
   <li><label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label></li>
@@ -210,6 +211,9 @@ async function processGPX(){
     }
     if(document.getElementById("ele_process").value === "google"){
       await addElevation(xmldocs);
+    }
+    if(document.getElementById("ele_process").value === "gsi"){
+      await addElevationGSI(xmldocs);
     }
     if(document.getElementById("delete_time").checked === true){
       deleteElements(xmldocs, "trkpt > time, rtept > time, wpt > time", "");
@@ -666,6 +670,59 @@ function addElevation(gpxdocs){
       }, wait);
     }
   });
+}
+
+/**
+ * 標高を基盤地図情報APIから取得
+ * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
+ * @return {Promise}
+ */
+async function addElevationGSI(gpxdocs){
+  for(const gpxdoc of gpxdocs){
+    let eles = gpxdoc.querySelectorAll("ele");
+    let trkpts_array = Array.from(gpxdoc.querySelectorAll("trkpt, rtept, wpt"));
+    
+    for(const ele of eles){
+      ele.parentNode.removeChild(ele);
+    }
+    
+    const ele_result = await Promise.all(
+      trkpts_array.map(function(trkpt, idx){
+        const lat = trkpt.getAttribute("lat");
+        const lon = trkpt.getAttribute("lon");
+        /*
+        // 一括でAPI呼び出し → 当然fail
+        return fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
+            response => response.json()
+          ).then(
+            data => data.elevation
+          ).catch(
+            e => null
+          );*/
+        return new Promise(function(resolve, reject){
+          setTimeout(function(){
+            fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
+              response => response.json()
+            ).then(
+              data => resolve(data.elevation)
+            ).catch(
+              e => resolve(null)
+            );
+          }, 10 * idx);
+        });
+      })
+    );
+    
+    for(let i = 0; i < trkpts_array.length; i++){
+      if(ele_result[i] !== null){
+        let ele = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "ele");
+        ele.appendChild(gpxdoc.createTextNode(ele_result[i].toFixed(2)));
+        
+        trkpts_array[i].appendChild(ele);
+      }
+    }
+    
+  }
 }
 
 /**
