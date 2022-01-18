@@ -77,7 +77,7 @@ ul li select { width: 100%; max-width: 240px; }
     <option value="toFixed_2">小数点以下2桁</option>
     <option value="toFixed_3">小数点以下3桁</option>
     <option value="google">Google Mapsの標高に修正(100点/秒)</option>
-    <option value="gsi">国土地理院APIの標高に修正</option>
+    <option value="gsi">国土地理院APIの標高に修正(激遅)</option>
    </select>
   </li>
   <li><label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label></li>
@@ -685,20 +685,12 @@ async function addElevationGSI(gpxdocs){
     for(const ele of eles){
       ele.parentNode.removeChild(ele);
     }
-    
+    /*
     const ele_result = await Promise.all(
       trkpts_array.map(function(trkpt, idx){
         const lat = trkpt.getAttribute("lat");
         const lon = trkpt.getAttribute("lon");
-        /*
-        // 一括でAPI呼び出し → 当然fail
-        return fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
-            response => response.json()
-          ).then(
-            data => data.elevation
-          ).catch(
-            e => null
-          );*/
+        
         return new Promise(function(resolve, reject){
           setTimeout(function(){
             fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
@@ -708,10 +700,27 @@ async function addElevationGSI(gpxdocs){
             ).catch(
               e => resolve(null)
             );
-          }, 10 * idx);
+          }, 1 * idx;
         });
       })
-    );
+    );*/
+    const ele_result = [];
+    for(let i = 0; i < trkpts_array.length; i++){
+      const trkpt = trkpts_array[i];
+      const lat = trkpt.getAttribute("lat");
+      const lon = trkpt.getAttribute("lon");
+      
+      ele_result.push(await fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
+        response => response.json()
+      ).then(
+        data => data.elevation
+      ).catch(
+        e => null
+      ));
+      
+      progressMessage("Add elevation... : " + i + " / " + trkpts_array.length);
+    }
+    progressMessage("");
     
     for(let i = 0; i < trkpts_array.length; i++){
       if(ele_result[i] !== null){
