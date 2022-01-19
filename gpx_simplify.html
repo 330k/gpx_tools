@@ -692,14 +692,27 @@ async function addElevationGSI(gpxdocs){
   const ele_result = [];
   for(let i = 0; i < trkpts_array.length; i++){
     const trkpt = trkpts_array[i];
-    const lat = trkpt.getAttribute("lat");
-    const lon = trkpt.getAttribute("lon");
+    const lat = trkpt.getAttribute("lat") - 0;
+    const lon = trkpt.getAttribute("lon") - 0;
     
-    const ele = await getElevationGSI(lat - 0, lon - 0);
-    if(ele){
-      ele_result.push(ele);
-    }else{
-      // タイルになかった場合はポイントだけAPIを呼び出す
+    let ele = null;
+    const tile_order = [
+      {tilename: "dem5a_png", zoom: 15},
+      {tilename: "dem5b_png", zoom: 15},
+      {tilename: "dem5c_png", zoom: 15},
+      {tilename: "dem_png", zoom: 14}
+    ];
+    for(const tile of tile_order){
+      ele = await getElevationGSI(lat, lon, tile.tilename, tile.zoom);
+      if(ele !== null){
+        if(tile.tilename !== "dem5a_png"){ console.log(tile.tilename); }
+        break;
+      }
+    }
+    
+    /*
+    if(ele === null){
+      // タイルになかった場合 or 無効な値だった場合はポイントだけAPIを呼び出す
       ele_result.push(await fetch(`https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
         response => response.json()
       ).then(data => {
@@ -712,7 +725,8 @@ async function addElevationGSI(gpxdocs){
       }).catch(
         e => null
       ));
-    }
+    }*/
+    ele_result.push(ele);
     
     progressMessage("Add elevation... : " + i + " / " + trkpts_array.length);
   }
@@ -731,7 +745,7 @@ async function addElevationGSI(gpxdocs){
 
 (function(global){
   const TILE_SIZE = 256;
-  const ZOOM = 15;
+  const TILE_NULL_SYMBOL = Symbol(); // タイルファイルが存在しないことを示すシンボル
   
   function latlon2tile(lat, lon, zoom){
     const x = (lon+180)/360*Math.pow(2,zoom);
@@ -752,44 +766,32 @@ async function addElevationGSI(gpxdocs){
   
   /**
    * 指定した緯度経度の標高を基盤地図情報APIから取得
-   * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
+   * @param {number} lat 緯度
+   * @param {number} lon 経度
+   * @param {String} tilename タイル名
+   * @param {number} zoom ズームレベル(タイルにより1-15, 1-14)
    * @return {Promise}
    */
-  global.getElevationGSI = async function getElevationGSI(lat, lon){
-    const tileinfo = latlon2tile(lat, lon, ZOOM);
+  global.getElevationGSI = async function getElevationGSI(lat, lon, tilename = "dem5a_png", zoom = 15){
+    const tileinfo = latlon2tile(lat, lon, zoom);
+    if(!(cache[tilename])){
+      cache[tilename] = {};
+    }
+    if(!(cache[tilename][zoom])){
+      cache[tilename][zoom] = {};
+    }
     
-    if(!(cache[tileinfo.tile_x] && cache[tileinfo.tile_x][tileinfo.tile_y])){
+    if(!(cache[tilename][zoom][tileinfo.tile_x] && cache[tilename][zoom][tileinfo.tile_x][tileinfo.tile_y])){
       // キャッシュにタイルがない場合
-      let pngblob = null;
-      pngblob = await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5a_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
+      const pngblob = await fetch("https://cyberjapandata.gsi.go.jp/xyz/" + tilename + "/" + zoom + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
         if(response.ok){
           return response.blob();
         }else{
           return null;
         }
       });
-      if(pngblob === null){
-        console.log("dem5b");
-        pngblob = await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5b_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
-          if(response.ok){
-            return response.blob();
-          }else{
-            return null;
-          }
-        });
-      }
-      if(pngblob === null){
-        console.log("dem5c");
-        pngblob = await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5c_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
-          if(response.ok){
-            return response.blob();
-          }else{
-            return null;
-          }
-        });
-      }
       
-      const eledata = [];
+      let eledata = [];
       if(pngblob !== null){
         await (new Promise(function(resolve, reject){
           const img = document.createElement("img");
@@ -818,26 +820,24 @@ async function addElevationGSI(gpxdocs){
         });
         
       }else{
-        // エラー時はすべてnull
-        for(let j = 0; j < TILE_SIZE; j++){
-          const r = [];
-          for(let i = 0; i < TILE_SIZE; i++){
-            r.push(null);
-          }
-          eledata.push(r);
-        }
+        // エラー時は存在しないことを示すシンボルにする
+        eledata = TILE_NULL_SYMBOL;
       }
         
       // キャッシュに登録
-      if(!(cache[tileinfo.tile_x])){
-        cache[tileinfo.tile_x] = {};
+      if(!(cache[tilename][zoom][tileinfo.tile_x])){
+        cache[tilename][zoom][tileinfo.tile_x] = {};
       }
-      cache[tileinfo.tile_x][tileinfo.tile_y] = eledata;
+      cache[tilename][zoom][tileinfo.tile_x][tileinfo.tile_y] = eledata;
     }
     
-    const eledata = cache[tileinfo.tile_x][tileinfo.tile_y];
+    const eledata = cache[tilename][zoom][tileinfo.tile_x][tileinfo.tile_y];
     
-    return eledata[Math.floor(tileinfo.pixel_y)][Math.floor(tileinfo.pixel_x)];
+    if(eledata !== TILE_NULL_SYMBOL){
+      return eledata[Math.floor(tileinfo.pixel_y)][Math.floor(tileinfo.pixel_x)];
+    }else{
+      return null;
+    }
     
   };
 })(this);
