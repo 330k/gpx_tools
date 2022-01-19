@@ -678,59 +678,43 @@ function addElevation(gpxdocs){
  * @return {Promise}
  */
 async function addElevationGSI(gpxdocs){
+  const trkpts_array = [];
+  
   for(const gpxdoc of gpxdocs){
     let eles = gpxdoc.querySelectorAll("ele");
-    let trkpts_array = Array.from(gpxdoc.querySelectorAll("trkpt, rtept, wpt"));
+    trkpts_array.push(...Array.from(gpxdoc.querySelectorAll("trkpt, rtept, wpt")));
     
     for(const ele of eles){
       ele.parentNode.removeChild(ele);
     }
-    /*
-    const ele_result = await Promise.all(
-      trkpts_array.map(function(trkpt, idx){
-        const lat = trkpt.getAttribute("lat");
-        const lon = trkpt.getAttribute("lon");
-        
-        return new Promise(function(resolve, reject){
-          setTimeout(function(){
-            fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
-              response => response.json()
-            ).then(
-              data => resolve(data.elevation)
-            ).catch(
-              e => resolve(null)
-            );
-          }, 1 * idx;
-        });
-      })
-    );*/
-    const ele_result = [];
-    for(let i = 0; i < trkpts_array.length; i++){
-      const trkpt = trkpts_array[i];
-      const lat = trkpt.getAttribute("lat");
-      const lon = trkpt.getAttribute("lon");
-      
-      ele_result.push(await fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
-        response => response.json()
-      ).then(
-        data => data.elevation
-      ).catch(
-        e => null
-      ));
-      
-      progressMessage("Add elevation... : " + i + " / " + trkpts_array.length);
-    }
-    progressMessage("");
+  }
     
-    for(let i = 0; i < trkpts_array.length; i++){
-      if(ele_result[i] !== null){
-        let ele = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "ele");
-        ele.appendChild(gpxdoc.createTextNode(ele_result[i].toFixed(2)));
-        
-        trkpts_array[i].appendChild(ele);
-      }
-    }
+  const ele_result = [];
+  for(let i = 0; i < trkpts_array.length; i++){
+    const trkpt = trkpts_array[i];
+    const lat = trkpt.getAttribute("lat");
+    const lon = trkpt.getAttribute("lon");
     
+    ele_result.push(await fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
+      response => response.json()
+    ).then(
+      data => data.elevation
+    ).catch(
+      e => null
+    ));
+    
+    progressMessage("Add elevation... : " + i + " / " + trkpts_array.length);
+  }
+  progressMessage("");
+    
+  for(let i = 0; i < trkpts_array.length; i++){
+    if(ele_result[i] !== null){
+      let root = trkpts_array[i].getRootNode();
+      let ele = root.createElementNS(root.documentElement.namespaceURI, "ele");
+      ele.appendChild(root.createTextNode(ele_result[i].toFixed(2)));
+      
+      trkpts_array[i].appendChild(ele);
+    }
   }
 }
 
