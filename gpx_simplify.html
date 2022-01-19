@@ -702,9 +702,14 @@ async function addElevationGSI(gpxdocs){
       // タイルになかった場合はポイントだけAPIを呼び出す
       ele_result.push(await fetch(`https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
         response => response.json()
-      ).then(
-        data => {console.log(data); return data.elevation}
-      ).catch(
+      ).then(data => {
+        console.log(data);
+        if(typeof(data.elevation) === "number"){
+          return data.elevation;
+        }else{
+          return null;
+        }
+      }).catch(
         e => null
       ));
     }
@@ -727,7 +732,7 @@ async function addElevationGSI(gpxdocs){
 (function(global){
   const TILE_SIZE = 256;
   const ZOOM = 15;
-
+  
   function latlon2tile(lat, lon, zoom){
     const x = (lon+180)/360*Math.pow(2,zoom);
     const y = (1-Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180))/Math.PI)/2 *Math.pow(2,zoom);
@@ -755,47 +760,65 @@ async function addElevationGSI(gpxdocs){
     
     if(!(cache[tileinfo.tile_x] && cache[tileinfo.tile_x][tileinfo.tile_y])){
       // キャッシュにタイルがない場合
-      //await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5a_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
-      await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5a_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
+      let pngblob = null;
+      pngblob = await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5a_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
         if(response.ok){
           return response.blob();
         }else{
-          throw new Error(response.status);
+          return null;
         }
-      }).then(data => new Promise(function(resolve, reject){
-        const img = document.createElement("img");
-        img.src = URL.createObjectURL(data);
-        img.onload = function(){ resolve(img); };
-        
-      })).then(img => {
-        ctx.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
-        const imagedata = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
-        
-        const eledata = [];
-        for(let j = 0; j < TILE_SIZE; j++){
-          const r = [];
-          for(let i = 0; i < TILE_SIZE; i++){
-            const x = 65536 * imagedata[(j * TILE_SIZE + i) * 4] + 256 * imagedata[(j * TILE_SIZE + i) * 4 + 1] + imagedata[(j * TILE_SIZE + i) * 4 + 2];
-            
-            if(x < 2 ** 23){
-              r.push(x * 0.01);
-            }else if(x === 2 ** 23){
-              r.push(null);
-            }else{
-              r.push((x - 2 ** 24) * 0.01);
-            }
+      });
+      if(pngblob === null){
+        console.log("dem5b");
+        pngblob = await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5b_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
+          if(response.ok){
+            return response.blob();
+          }else{
+            return null;
           }
-          eledata.push(r);
-        }
+        });
+      }
+      if(pngblob === null){
+        console.log("dem5c");
+        pngblob = await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5c_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
+          if(response.ok){
+            return response.blob();
+          }else{
+            return null;
+          }
+        });
+      }
+      
+      const eledata = [];
+      if(pngblob !== null){
+        await (new Promise(function(resolve, reject){
+          const img = document.createElement("img");
+          img.src = URL.createObjectURL(pngblob);
+          img.onload = function(){ resolve(img); };
+          
+        })).then(img => {
+          ctx.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
+          const imagedata = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+          
+          for(let j = 0; j < TILE_SIZE; j++){
+            const r = [];
+            for(let i = 0; i < TILE_SIZE; i++){
+              const x = 65536 * imagedata[(j * TILE_SIZE + i) * 4] + 256 * imagedata[(j * TILE_SIZE + i) * 4 + 1] + imagedata[(j * TILE_SIZE + i) * 4 + 2];
+              
+              if(x < 2 ** 23){
+                r.push(x * 0.01);
+              }else if(x === 2 ** 23){
+                r.push(null);
+              }else{
+                r.push((x - 2 ** 24) * 0.01);
+              }
+            }
+            eledata.push(r);
+          }
+        });
         
-        // キャッシュに登録
-        if(!(cache[tileinfo.tile_x])){
-          cache[tileinfo.tile_x] = {};
-        }
-        cache[tileinfo.tile_x][tileinfo.tile_y] = eledata;
-      }).catch(function(){
+      }else{
         // エラー時はすべてnull
-        const eledata = [];
         for(let j = 0; j < TILE_SIZE; j++){
           const r = [];
           for(let i = 0; i < TILE_SIZE; i++){
@@ -803,13 +826,13 @@ async function addElevationGSI(gpxdocs){
           }
           eledata.push(r);
         }
+      }
         
-        // キャッシュに登録
-        if(!(cache[tileinfo.tile_x])){
-          cache[tileinfo.tile_x] = {};
-        }
-        cache[tileinfo.tile_x][tileinfo.tile_y] = eledata;
-      });
+      // キャッシュに登録
+      if(!(cache[tileinfo.tile_x])){
+        cache[tileinfo.tile_x] = {};
+      }
+      cache[tileinfo.tile_x][tileinfo.tile_y] = eledata;
     }
     
     const eledata = cache[tileinfo.tile_x][tileinfo.tile_y];
