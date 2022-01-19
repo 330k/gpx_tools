@@ -77,7 +77,7 @@ ul li select { width: 100%; max-width: 240px; }
     <option value="toFixed_2">小数点以下2桁</option>
     <option value="toFixed_3">小数点以下3桁</option>
     <option value="google">Google Mapsの標高に修正(100点/秒)</option>
-    <option value="gsi">国土地理院APIの標高に修正(激遅)</option>
+    <option value="gsi">国土地理院APIの標高に修正</option>
    </select>
   </li>
   <li><label><input type="checkbox" id="delete_time" />時刻(time要素)を削除</label></li>
@@ -611,7 +611,7 @@ function deleteWhitespaces(gpxdocs){
 }
 
 /**
- * 標高をGoogle Elevations APIから取得
+ * 標高をGoogle Elevations APIから取得して追加
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
  * @return {Promise}
  */
@@ -673,7 +673,7 @@ function addElevation(gpxdocs){
 }
 
 /**
- * 標高を基盤地図情報APIから取得
+ * 標高を基盤地図情報APIから取得して追加
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
  * @return {Promise}
  */
@@ -688,25 +688,31 @@ async function addElevationGSI(gpxdocs){
       ele.parentNode.removeChild(ele);
     }
   }
-    
+  
   const ele_result = [];
   for(let i = 0; i < trkpts_array.length; i++){
     const trkpt = trkpts_array[i];
     const lat = trkpt.getAttribute("lat");
     const lon = trkpt.getAttribute("lon");
     
-    ele_result.push(await fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
-      response => response.json()
-    ).then(
-      data => data.elevation
-    ).catch(
-      e => null
-    ));
+    const ele = await getElevationGSI(lat - 0, lon - 0);
+    if(ele){
+      ele_result.push(ele);
+    }else{
+      // タイルになかった場合はポイントだけAPIを呼び出す
+      ele_result.push(await fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
+        response => response.json()
+      ).then(
+        data => {console.log(data); return data.elevation}
+      ).catch(
+        e => null
+      ));
+    }
     
     progressMessage("Add elevation... : " + i + " / " + trkpts_array.length);
   }
   progressMessage("");
-    
+  
   for(let i = 0; i < trkpts_array.length; i++){
     if(ele_result[i] !== null){
       let root = trkpts_array[i].getRootNode();
@@ -717,6 +723,101 @@ async function addElevationGSI(gpxdocs){
     }
   }
 }
+
+(function(global){
+  const TILE_SIZE = 256;
+  const ZOOM = 15;
+
+  function latlon2tile(lat, lon, zoom){
+    const x = (lon+180)/360*Math.pow(2,zoom);
+    const y = (1-Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180))/Math.PI)/2 *Math.pow(2,zoom);
+    return {
+      "tile_x" : Math.floor(x),
+      "tile_y" : Math.floor(y),
+      "pixel_x" : (x - Math.floor(x)) * 256,
+      "pixel_y" : (y - Math.floor(y)) * 256
+    };
+  }
+  global._cache = {};
+  const cache = global._cache;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = TILE_SIZE;
+  canvas.height = TILE_SIZE;
+  
+  /**
+   * 指定した緯度経度の標高を基盤地図情報APIから取得
+   * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
+   * @return {Promise}
+   */
+  global.getElevationGSI = async function getElevationGSI(lat, lon){
+    const tileinfo = latlon2tile(lat, lon, ZOOM);
+    
+    if(!(cache[tileinfo.tile_x] && cache[tileinfo.tile_x][tileinfo.tile_y])){
+      // キャッシュにタイルがない場合
+      //await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5a_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
+      await fetch("https://cyberjapandata.gsi.go.jp/xyz/dem5a_png/" + ZOOM + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
+        if(response.ok){
+          return response.blob();
+        }else{
+          throw new Error(response.status);
+        }
+      }).then(data => new Promise(function(resolve, reject){
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(data);
+        img.onload = function(){ resolve(img); };
+        
+      })).then(img => {
+        ctx.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
+        const imagedata = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+        
+        const eledata = [];
+        for(let j = 0; j < TILE_SIZE; j++){
+          const r = [];
+          for(let i = 0; i < TILE_SIZE; i++){
+            const x = 65536 * imagedata[(j * TILE_SIZE + i) * 4] + 256 * imagedata[(j * TILE_SIZE + i) * 4 + 1] + imagedata[(j * TILE_SIZE + i) * 4 + 2];
+            
+            if(x < 2 ** 23){
+              r.push(x * 0.01);
+            }else if(x === 2 ** 23){
+              r.push(null);
+            }else{
+              r.push((x - 2 ** 24) * 0.01);
+            }
+          }
+          eledata.push(r);
+        }
+        
+        // キャッシュに登録
+        if(!(cache[tileinfo.tile_x])){
+          cache[tileinfo.tile_x] = {};
+        }
+        cache[tileinfo.tile_x][tileinfo.tile_y] = eledata;
+      }).catch(function(){
+        // エラー時はすべてnull
+        const eledata = [];
+        for(let j = 0; j < TILE_SIZE; j++){
+          const r = [];
+          for(let i = 0; i < TILE_SIZE; i++){
+            r.push(null);
+          }
+          eledata.push(r);
+        }
+        
+        // キャッシュに登録
+        if(!(cache[tileinfo.tile_x])){
+          cache[tileinfo.tile_x] = {};
+        }
+        cache[tileinfo.tile_x][tileinfo.tile_y] = eledata;
+      });
+    }
+    
+    const eledata = cache[tileinfo.tile_x][tileinfo.tile_y];
+    
+    return eledata[Math.floor(tileinfo.pixel_y)][Math.floor(tileinfo.pixel_x)];
+    
+  };
+})(this);
 
 /**
  * 各GPXのname要素を取得して配列として返す
