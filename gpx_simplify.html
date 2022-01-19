@@ -695,20 +695,7 @@ async function addElevationGSI(gpxdocs){
     const lat = trkpt.getAttribute("lat") - 0;
     const lon = trkpt.getAttribute("lon") - 0;
     
-    let ele = null;
-    const tile_order = [
-      {tilename: "dem5a_png", zoom: 15},
-      {tilename: "dem5b_png", zoom: 15},
-      {tilename: "dem5c_png", zoom: 15},
-      {tilename: "dem_png", zoom: 14}
-    ];
-    for(const tile of tile_order){
-      ele = await getElevationGSI(lat, lon, tile.tilename, tile.zoom);
-      if(ele !== null){
-        if(tile.tilename !== "dem5a_png"){ console.log(tile.tilename); }
-        break;
-      }
-    }
+    let ele = await getElevationGSI(lat, lon);
     
     /*
     if(ele === null){
@@ -746,7 +733,19 @@ async function addElevationGSI(gpxdocs){
 (function(global){
   const TILE_SIZE = 256;
   const TILE_NULL_SYMBOL = Symbol(); // タイルファイルが存在しないことを示すシンボル
+  const TILE_ORDER = [
+    {tilename: "dem5a_png", zoom: 15},
+    {tilename: "dem5b_png", zoom: 15},
+    {tilename: "dem5c_png", zoom: 15},
+    {tilename: "dem_png", zoom: 14}
+  ]; // 検索順序とズームレベル
   
+  /**
+   * 指定した緯度経度とズームレベルから、タイル番号とタイル内のx, y座標を返す
+   * @param {number} lat 緯度
+   * @param {number} lon 経度
+   * @return {{tile_x:number,tile_y:number,pixel_x:number,pixel_y:number}}
+   */
   function latlon2tile(lat, lon, zoom){
     const x = (lon+180)/360*Math.pow(2,zoom);
     const y = (1-Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180))/Math.PI)/2 *Math.pow(2,zoom);
@@ -765,14 +764,33 @@ async function addElevationGSI(gpxdocs){
   canvas.height = TILE_SIZE;
   
   /**
-   * 指定した緯度経度の標高を基盤地図情報APIから取得
+   * 指定した緯度経度の標高を基盤地図情報APIから取得する
+   * @param {number} lat 緯度
+   * @param {number} lon 経度
+   * @return {Promise}
+   */
+  global.getElevationGSI = async function(lat, lon){
+    let ele = null;
+    for(const tile of TILE_ORDER){
+      ele = await _getElevationGSI(lat, lon, tile.tilename, tile.zoom);
+      if(ele !== null){
+        if(tile.tilename !== "dem5a_png"){ console.log(tile.tilename); }
+        break;
+      }
+    }
+    
+    return ele;
+  };
+  
+  /**
+   * 指定した緯度経度の標高を基盤地図情報APIから取得(内部関数)
    * @param {number} lat 緯度
    * @param {number} lon 経度
    * @param {String} tilename タイル名
    * @param {number} zoom ズームレベル(タイルにより1-15, 1-14)
    * @return {Promise}
    */
-  global.getElevationGSI = async function getElevationGSI(lat, lon, tilename = "dem5a_png", zoom = 15){
+  async function _getElevationGSI(lat, lon, tilename = "dem5a_png", zoom = 15){
     const tileinfo = latlon2tile(lat, lon, zoom);
     if(!(cache[tilename])){
       cache[tilename] = {};
