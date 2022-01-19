@@ -700,7 +700,7 @@ async function addElevationGSI(gpxdocs){
       ele_result.push(ele);
     }else{
       // タイルになかった場合はポイントだけAPIを呼び出す
-      ele_result.push(await fetch(`http://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
+      ele_result.push(await fetch(`https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}`).then(
         response => response.json()
       ).then(
         data => {console.log(data); return data.elevation}
