@@ -757,33 +757,82 @@ async function addElevationGSI(gpxdocs){
     };
   }
   
-  function cachedFetch(){
-    const self = this;
-    self._cache = null;
+  /**
+   * 標高タイルのImageDataを取得(L1、L2キャッシュ付き)
+   * L1: オンメモリキャッシュ
+   * L2: Cache APIによるresponseの永続キャッシュ
+   */
+  function imagedataCache(){
+    const L1_CACHE_SIZE = 1000;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = TILE_SIZE;
+    canvas.height = TILE_SIZE;
+    
+    const l1_cache_keys = [];
+    const l1_cache_values = [];
+    let l2_cache = null;
     
     caches.open("gsi_ele_tile").then((cs) => {
-      self._cache = cs;
+      l2_cache = cs;
     });
     
-    self.fetch = async function(url){
-      let response = await self._cache.match(url);
+    this.getImageData = async function(url){
+      let imagedata;
       
-      if(response === undefined){
-        // キャッシュにタイルがない場合
-        response = await fetch(url);
-        await self._cache.put(url, response);
-        response = await self._cache.match(url);
+      if(l1_cache_keys.includes(url)){
+        imagedata = l1_cache_values[l1_cache_keys.indexOf(url)];
+        //console.log("L1 cache hit");
+        
+      }else{
+        let response = await l2_cache.match(url);
+        
+        if(response === undefined){
+          // キャッシュにタイルがない場合
+          response = await fetch(url);
+          await l2_cache.put(url, response);
+          response = await l2_cache.match(url);
+          //console.log("cache miss");
+          
+        }else{
+          //console.log("L2 cache hit");
+          
+        }
+        
+        if(response.ok){
+          const img = document.createElement("img");
+          const blob = await response.blob();
+          
+          imagedata = await new Promise(function(resolve, reject){
+            img.src = URL.createObjectURL(blob);
+            img.onload = function(){ resolve(img); };
+            
+          }).then((img) => {
+            ctx.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
+            return ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+          });
+          
+          // L1キャッシュに保存
+          l1_cache_keys.push(url);
+          l1_cache_values.push(imagedata);
+          if(l1_cache_keys.length > L1_CACHE_SIZE){
+            l1_cache_keys.shift();
+            l1_cache_values.shift();
+            console.log("L1 cache size exceed");
+          }
+            
+        }else{
+          imagedata = null;
+          
+        }
       }
       
-      return response;
+      return imagedata;
     };
+    
     return this;
   }
-  const cache = new cachedFetch();
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  canvas.width = TILE_SIZE;
-  canvas.height = TILE_SIZE;
+  const cache = new imagedataCache();
   
   /**
    * 指定した緯度経度の標高を基盤地図情報APIから取得する
@@ -815,21 +864,9 @@ async function addElevationGSI(gpxdocs){
   async function _getElevationGSI(lat, lon, tilename = "dem5a_png", zoom = 15){
     const tileinfo = latlon2tile(lat, lon, zoom);
     const url = "https://cyberjapandata.gsi.go.jp/xyz/" + tilename + "/" + zoom + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png";
-    const response = await cache.fetch(url);
+    const imagedata = await cache.getImageData(url);
     
-    if(response.ok){
-      const pngblob = await response.blob();
-      const img = document.createElement("img");
-      
-      const imagedata = await new Promise(function(resolve, reject){
-        img.src = URL.createObjectURL(pngblob);
-        img.onload = function(){ resolve(img); };
-        
-      }).then((img) => {
-        ctx.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
-        return ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
-      });
-      
+    if(imagedata){
       // 最近傍点の標高を返す
       const idx = 4 * (Math.floor(tileinfo.pixel_y) * TILE_SIZE + Math.floor(tileinfo.pixel_x));
       const x = 65536 * imagedata[idx] + 256 * imagedata[idx + 1] + imagedata[idx + 2];
