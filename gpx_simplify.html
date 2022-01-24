@@ -730,7 +730,7 @@ async function addElevationGSI(gpxdocs){
   }
 }
 
-(function(global){
+(async function(global){
   const TILE_SIZE = 256;
   const TILE_NULL_SYMBOL = Symbol(); // タイルファイルが存在しないことを示すシンボル
   const TILE_ORDER = [
@@ -756,8 +756,30 @@ async function addElevationGSI(gpxdocs){
       "pixel_y" : (y - Math.floor(y)) * 256
     };
   }
-  global._cache = {};
-  const cache = global._cache;
+  
+  function cachedFetch(){
+    const self = this;
+    self._cache = null;
+    
+    caches.open("gsi_ele_tile").then((cs) => {
+      self._cache = cs;
+    });
+    
+    self.fetch = async function(url){
+      let response = await self._cache.match(url);
+      
+      if(response === undefined){
+        // キャッシュにタイルがない場合
+        response = await fetch(url);
+        await self._cache.put(url, response);
+        response = await self._cache.match(url);
+      }
+      
+      return response;
+    };
+    return this;
+  }
+  const cache = new cachedFetch();
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   canvas.width = TILE_SIZE;
@@ -792,46 +814,23 @@ async function addElevationGSI(gpxdocs){
    */
   async function _getElevationGSI(lat, lon, tilename = "dem5a_png", zoom = 15){
     const tileinfo = latlon2tile(lat, lon, zoom);
-    if(!(cache[tilename])){
-      cache[tilename] = {};
-    }
-    if(!(cache[tilename][zoom])){
-      cache[tilename][zoom] = {};
-    }
+    const url = "https://cyberjapandata.gsi.go.jp/xyz/" + tilename + "/" + zoom + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png";
+    const response = await cache.fetch(url);
     
-    if(!(cache[tilename][zoom][tileinfo.tile_x] && cache[tilename][zoom][tileinfo.tile_x][tileinfo.tile_y])){
-      // キャッシュにタイルがない場合
-      let imagedata = TILE_NULL_SYMBOL;
-      await fetch("https://cyberjapandata.gsi.go.jp/xyz/" + tilename + "/" + zoom + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png").then(response => {
-        if(response.ok){
-          return response.blob();
-        }else{
-          throw new Error(response.status);
-        }
-      }).then((pngblob) => new Promise(function(resolve, reject){
-        const img = document.createElement("img");
+    if(response.ok){
+      const pngblob = await response.blob();
+      const img = document.createElement("img");
+      
+      const imagedata = await new Promise(function(resolve, reject){
         img.src = URL.createObjectURL(pngblob);
         img.onload = function(){ resolve(img); };
-          
-      })).then((img) => {
+        
+      }).then((img) => {
         ctx.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
-        imagedata = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
-        
-      }).catch(() => {
-        //console.log("ERROR");
+        return ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
       });
-        
-      // ImageDataをキャッシュに登録
-      if(!(cache[tilename][zoom][tileinfo.tile_x])){
-        cache[tilename][zoom][tileinfo.tile_x] = {};
-      }
-      cache[tilename][zoom][tileinfo.tile_x][tileinfo.tile_y] = imagedata;
-    }
-    
-    const imagedata = cache[tilename][zoom][tileinfo.tile_x][tileinfo.tile_y];
-    
-    // 最近傍点の標高を返す
-    if(imagedata !== TILE_NULL_SYMBOL){
+      
+      // 最近傍点の標高を返す
       const idx = 4 * (Math.floor(tileinfo.pixel_y) * TILE_SIZE + Math.floor(tileinfo.pixel_x));
       const x = 65536 * imagedata[idx] + 256 * imagedata[idx + 1] + imagedata[idx + 2];
       
