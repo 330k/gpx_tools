@@ -793,8 +793,7 @@ async function addElevationGSI(gpxdocs){
         if(response === undefined){
           // キャッシュにタイルがない場合
           response = await fetch(url);
-          await l2_cache.put(url, response);
-          response = await l2_cache.match(url);
+          await l2_cache.put(url, response.clone());
           //console.log("cache miss");
           
         }else{
