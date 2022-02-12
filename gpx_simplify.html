@@ -689,7 +689,7 @@ async function addElevationGSI(gpxdocs){
     }
   }
   
-  const ele_result = [];
+  const ele_result = [];console.time("getElevationGSI");
   for(let i = 0; i < trkpts_array.length; i++){
     const trkpt = trkpts_array[i];
     const lat = trkpt.getAttribute("lat") - 0;
@@ -717,7 +717,7 @@ async function addElevationGSI(gpxdocs){
     
     progressMessage("Add elevation... : " + i + " / " + trkpts_array.length);
   }
-  progressMessage("");
+  progressMessage("");console.timeEnd("getElevationGSI");
   
   for(let i = 0; i < trkpts_array.length; i++){
     if(ele_result[i] !== null){
@@ -758,98 +758,120 @@ async function addElevationGSI(gpxdocs){
   }
   
   /**
-   * 画像のImageDataを取得(L1、L2キャッシュ付き)
-   * L1: オンメモリキャッシュ
-   * L2: Cache APIによるresponseのキャッシュ
-   * @param width {number} 幅
-   * @param height {number} 高さ
-   * @param l1_cache_size {number} L1キャッシュに保持する件数
-   * @param l2_cache_expiration {number} Cache APIで保持したキャッシュの有効期間(ミリ秒)
+   * L1, L2の2層のキャッシュ
+   * @param {string} cache_name          Cache APIの名前
+   * @param {function} parser            responseを受け取ってキャッシュに保存する内容を返すコールバック関数(async function可)
+   * @param {number} l1_cache_size       L1キャッシュに保持するURL件数
+   * @param {number} l2_cache_expiration L2キャッシュの有効期限
    */
-  function imagedataCache(width, height, l1_cache_size = 1000, cache_expiration = 30 * 86400 * 1000){
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = width;
-    canvas.height = height;
-    
+  function LayeredCache(cache_name, parser, l1_cache_size = 1000, cache_expiration = 30 * 86400 * 1000){
+    const HEADER_EXPIRATION = "_expire_on";
     const l1_cache_keys = [];
     const l1_cache_values = [];
     let l2_cache = null;
+    let prepared = false;
     
-    caches.open("gsi_ele_tile").then((cs) => {
+    caches.open(cache_name).then((cs) => {
       l2_cache = cs;
+      prepared = true;
     });
     
     /**
-     * URLに指定した画像のgetImageData().dataを返す
+     * 指定したURLのデータがL1にあればL1キャッシュから、有効期限内のL2キャッシュにあればL2キャッシュから、期限切れまたはキャッシュにない場合はfetchして、
+     * responseをparser関数で処理した結果を返す
      * @param {string} url
+     * @return {Promise}
      */
-    this.getImageData = async function(url){
-      let imagedata;
+    this.fetch = async function(url){
+      let data;
+      // Cache APIの準備ができていなければ例外を投げる
+      if(!prepared){
+        throw new Exception("Cache API not ready");
+      }
       
       if(l1_cache_keys.includes(url)){
-        imagedata = l1_cache_values[l1_cache_keys.indexOf(url)];
-        console.log("L1 cache hit");
+        // L1キャッシュにヒット
+        
+        // L1キャッシュの先頭に移動(LRU)
+        const idx = l1_cache_keys.indexOf(url);
+        l1_cache_keys.unshift(l1_cache_keys.splice(idx, 1)[0]);
+        l1_cache_values.unshift(l1_cache_values.splice(idx, 1)[0]);
+        
+        data = l1_cache_values[0];
+        //data = l1_cache_values[idx];
+        //console.log("L1 cache hit");
         
       }else{
         let response = await l2_cache.match(url);
         
-        if((response === undefined) || (Date.now() - Number.parseInt(response.headers.get("fetched-on")) > cache_expiration )){
-          // キャッシュにタイルがない場合、またはキャッシュが期限切れの場合
+        if((response === undefined) || response.headers.get(HEADER_EXPIRATION) === null || (Date.now() > Number.parseInt(response.headers.get(HEADER_EXPIRATION)))){
+          // L2キャッシュにない場合、またはL2キャッシュが期限切れの場合
+          if(response === undefined){
+            //console.log("cache miss");
+          }else{
+            //console.log("cache expired");
+          }
+          
           response = await fetch(url);
           
           const copy = response.clone();
           const headers = new Headers(copy.headers);
-          headers.append("fetched-on", Date.now());
+          headers.append(HEADER_EXPIRATION, Date.now() + cache_expiration);
           
           const body = await copy.blob();
           
           await l2_cache.put(url, new Response(body, {
-						status: copy.status,
-						statusText: copy.statusText,
-						headers: headers
-					}));
-          console.log("cache miss");
+					  status: copy.status,
+					  statusText: copy.statusText,
+					  headers: headers
+				  }));
           
         }else{
-          console.log("L2 cache hit");
+          //console.log("L2 cache hit");
           
         }
         
-        if(response.ok){
-          const img = document.createElement("img");
-          const blob = await response.blob();
-          
-          imagedata = await new Promise(function(resolve, reject){
-            img.src = URL.createObjectURL(blob);
-            img.onload = function(){ resolve(img); };
-            
-          }).then((img) => {
-            ctx.drawImage(img, 0, 0, width, height);
-            return ctx.getImageData(0, 0, width, height).data;
-          });
-          
-          // L1キャッシュに保存
-          l1_cache_keys.push(url);
-          l1_cache_values.push(imagedata);
-          if(l1_cache_keys.length > l1_cache_size){
-            l1_cache_keys.shift();
-            l1_cache_values.shift();
-            console.log("L1 cache size exceed");
-          }
-            
-        }else{
-          imagedata = null;
-          
+        data = await parser(response);
+        
+        // L1キャッシュの先頭に保存
+        l1_cache_keys.unshift(url);
+        l1_cache_values.unshift(data);
+        if(l1_cache_keys.length > l1_cache_size){
+          l1_cache_keys.length = l1_cache_size;
+          l1_cache_values.length = l1_cache_size;
+          //console.log("L1 cache size exceed");
         }
       }
       
-      return imagedata;
+      return data;
     };
     
     return this;
   }
-  const cache = new imagedataCache(TILE_SIZE, TILE_SIZE, 100);
+  
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = TILE_SIZE;
+  canvas.height = TILE_SIZE;
+  const parser = async function(response){
+    if(response.ok){
+      const blob = await response.blob();
+      const img = document.createElement("img");
+      
+      const image = await new Promise(function(resolve, reject){
+        img.src = URL.createObjectURL(blob);
+        img.onload = function(){ resolve(img); };
+        
+      });
+      ctx.drawImage(image, 0, 0, TILE_SIZE, TILE_SIZE);
+      
+      return ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+      
+    }else{
+      return null;
+    }
+  };
+  const cache = new LayeredCache("gsi_ele_tile", parser, 10000, 60 * 1000);
   
   /**
    * 指定した緯度経度の標高を基盤地図情報APIから取得する
@@ -883,7 +905,7 @@ async function addElevationGSI(gpxdocs){
   async function _getElevationGSI(lat, lon, tilename = "dem5a_png", zoom = 15){
     const tileinfo = latlon2tile(lat, lon, zoom);
     const url = "https://cyberjapandata.gsi.go.jp/xyz/" + tilename + "/" + zoom + "/" + tileinfo.tile_x + "/" + tileinfo.tile_y + ".png";
-    const imagedata = await cache.getImageData(url);
+    const imagedata = await cache.fetch(url);
     
     if(imagedata){
       // 最近傍点の標高を返す
