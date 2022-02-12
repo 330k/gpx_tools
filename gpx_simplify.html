@@ -760,9 +760,13 @@ async function addElevationGSI(gpxdocs){
   /**
    * 画像のImageDataを取得(L1、L2キャッシュ付き)
    * L1: オンメモリキャッシュ
-   * L2: Cache APIによるresponseの永続キャッシュ
+   * L2: Cache APIによるresponseのキャッシュ
+   * @param width {number} 幅
+   * @param height {number} 高さ
+   * @param l1_cache_size {number} L1キャッシュに保持する件数
+   * @param l2_cache_expiration {number} Cache APIで保持したキャッシュの有効期間(ミリ秒)
    */
-  function imagedataCache(width, height, l1_cache_size = 1000){
+  function imagedataCache(width, height, l1_cache_size = 1000, cache_expiration = 30 * 86400 * 1000){
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     canvas.width = width;
@@ -785,19 +789,30 @@ async function addElevationGSI(gpxdocs){
       
       if(l1_cache_keys.includes(url)){
         imagedata = l1_cache_values[l1_cache_keys.indexOf(url)];
-        //console.log("L1 cache hit");
+        console.log("L1 cache hit");
         
       }else{
         let response = await l2_cache.match(url);
         
-        if(response === undefined){
-          // キャッシュにタイルがない場合
+        if((response === undefined) || (Date.now() - Number.parseInt(response.headers.get("fetched-on")) > cache_expiration )){
+          // キャッシュにタイルがない場合、またはキャッシュが期限切れの場合
           response = await fetch(url);
-          await l2_cache.put(url, response.clone());
-          //console.log("cache miss");
+          
+          const copy = response.clone();
+          const headers = new Headers(copy.headers);
+          headers.append("fetched-on", Date.now());
+          
+          const body = await copy.blob();
+          
+          await l2_cache.put(url, new Response(body, {
+						status: copy.status,
+						statusText: copy.statusText,
+						headers: headers
+					}));
+          console.log("cache miss");
           
         }else{
-          //console.log("L2 cache hit");
+          console.log("L2 cache hit");
           
         }
         
@@ -834,7 +849,7 @@ async function addElevationGSI(gpxdocs){
     
     return this;
   }
-  const cache = new imagedataCache(TILE_SIZE, TILE_SIZE);
+  const cache = new imagedataCache(TILE_SIZE, TILE_SIZE, 100);
   
   /**
    * 指定した緯度経度の標高を基盤地図情報APIから取得する
@@ -847,7 +862,9 @@ async function addElevationGSI(gpxdocs){
     for(const tile of TILE_ORDER){
       ele = await _getElevationGSI(lat, lon, tile.tilename, tile.zoom);
       if(ele !== null){
-        if(tile.tilename !== "dem5a_png"){ console.log(tile.tilename); }
+        if(tile.tilename !== "dem5a_png"){
+          //console.log(tile.tilename);
+        }
         break;
       }
     }
