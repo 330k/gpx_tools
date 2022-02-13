@@ -759,15 +759,14 @@ async function addElevationGSI(gpxdocs){
   
   /**
    * L1, L2の2層のキャッシュ
-   * @param {string} cache_name          Cache APIの名前
+   * @param {string} cache_name          Cache APIで使用する名前(cacheName)
    * @param {function} parser            responseを受け取ってキャッシュに保存する内容を返すコールバック関数(async function可)
    * @param {number} l1_cache_size       L1キャッシュに保持するURL件数
    * @param {number} l2_cache_expiration L2キャッシュの有効期限
    */
   function LayeredCache(cache_name, parser, l1_cache_size = 1000, cache_expiration = 30 * 86400 * 1000){
     const HEADER_EXPIRATION = "_expire_on";
-    const l1_cache_keys = [];
-    const l1_cache_values = [];
+    const l1_cache = [];
     let l2_cache = null;
     let prepared = false;
     
@@ -777,69 +776,88 @@ async function addElevationGSI(gpxdocs){
     });
     
     /**
-     * 指定したURLのデータがL1にあればL1キャッシュから、有効期限内のL2キャッシュにあればL2キャッシュから、期限切れまたはキャッシュにない場合はfetchして、
-     * responseをparser関数で処理した結果を返す
+     * 指定したURLのデータをparser関数で処理した結果を返す。
+     * L1にあればL1キャッシュからparserで処理済みの結果を返し、
+     * 有効期限内のL2キャッシュ(Cache API)があれば、再度parser関数で処理して返す。
      * @param {string} url
      * @return {Promise}
      */
     this.fetch = async function(url){
-      let data;
-      // Cache APIの準備ができていなければ例外を投げる
+      let data = null;
+      let fetch_flag = false;
+      let l1_update_flag = false;
+      const now = Date.now();
+      let expiration = now + cache_expiration;
+
       if(!prepared){
+        // Cache APIの準備ができていなければ例外を投げる
         throw new Exception("Cache API not ready");
       }
       
-      if(l1_cache_keys.includes(url)){
+      let idx = l1_cache.find((e) => e.url === url);
+      if(idx){
         // L1キャッシュにヒット
         
         // L1キャッシュの先頭に移動(LRU)
-        const idx = l1_cache_keys.indexOf(url);
-        l1_cache_keys.unshift(l1_cache_keys.splice(idx, 1)[0]);
-        l1_cache_values.unshift(l1_cache_values.splice(idx, 1)[0]);
-        
-        data = l1_cache_values[0];
-        //data = l1_cache_values[idx];
-        //console.log("L1 cache hit");
-        
+        l1_cache.unshift(l1_cache.splice(idx, 1)[0]);
+
+        if(now > l1_cache[0].expire_on){
+          // L1キャッシュで期限切れ
+          //console.log("l1 cache expired");
+          l1_cache.shift();
+          fetch_flag = true;
+        }else{
+          //console.log("l1 cache hit");
+          data = l1_cache[0].data;
+        }
+
       }else{
         let response = await l2_cache.match(url);
         
-        if((response === undefined) || response.headers.get(HEADER_EXPIRATION) === null || (Date.now() > Number.parseInt(response.headers.get(HEADER_EXPIRATION)))){
+        if((response === undefined)
+          || response.headers.get(HEADER_EXPIRATION) === null
+          || (now > Number.parseInt(response.headers.get(HEADER_EXPIRATION)))){
           // L2キャッシュにない場合、またはL2キャッシュが期限切れの場合
-          if(response === undefined){
-            //console.log("cache miss");
-          }else{
-            //console.log("cache expired");
-          }
-          
-          response = await fetch(url);
-          
-          const copy = response.clone();
-          const headers = new Headers(copy.headers);
-          headers.append(HEADER_EXPIRATION, Date.now() + cache_expiration);
-          
-          const body = await copy.blob();
-          
-          await l2_cache.put(url, new Response(body, {
-					  status: copy.status,
-					  statusText: copy.statusText,
-					  headers: headers
-				  }));
-          
+          //console.log("l2 cache expired");
+          fetch_flag = true;
         }else{
-          //console.log("L2 cache hit");
+          //console.log("l2 cache hit");
+          data = await parser(response);
+          expiration = Number.parseInt(response.headers.get(HEADER_EXPIRATION));
           
+          l1_update_flag = true;
         }
+      }
+      
+      if(fetch_flag){
+        // 通信して取得する
+        response = await fetch(url);
+        
+        const copy = response.clone();
+        const headers = new Headers(copy.headers);
+        headers.append(HEADER_EXPIRATION, expiration);
+        
+        const body = await copy.blob();
+        
+        await l2_cache.put(url, new Response(body, {
+          status: copy.status,
+          statusText: copy.statusText,
+          headers: headers
+        }));
         
         data = await parser(response);
-        
+        l1_update_flag = true;
+      }
+      
+      if(l1_update_flag){
         // L1キャッシュの先頭に保存
-        l1_cache_keys.unshift(url);
-        l1_cache_values.unshift(data);
-        if(l1_cache_keys.length > l1_cache_size){
-          l1_cache_keys.length = l1_cache_size;
-          l1_cache_values.length = l1_cache_size;
-          //console.log("L1 cache size exceed");
+        l1_cache.unshift({
+          url: url,
+          data: data,
+          expire_on: expiration
+        });
+        if(l1_cache.length > l1_cache_size){
+          l1_cache.length = l1_cache_size;
         }
       }
       
