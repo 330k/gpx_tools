@@ -794,20 +794,17 @@ async function addElevationGSI(gpxdocs){
         throw new Exception("Cache API not ready");
       }
       
-      let idx = l1_cache.find((e) => e.url === url);
-      if(idx){
+      let idx = l1_cache.findIndex((e) => e.url === url);
+      if(idx >= 0){
         // L1キャッシュにヒット
-        
         // L1キャッシュの先頭に移動(LRU)
         l1_cache.unshift(l1_cache.splice(idx, 1)[0]);
 
         if(now > l1_cache[0].expire_on){
           // L1キャッシュで期限切れ
-          //console.log("l1 cache expired");
           l1_cache.shift();
           fetch_flag = true;
         }else{
-          //console.log("l1 cache hit");
           data = l1_cache[0].data;
         }
 
@@ -818,10 +815,8 @@ async function addElevationGSI(gpxdocs){
           || response.headers.get(HEADER_EXPIRATION) === null
           || (now > Number.parseInt(response.headers.get(HEADER_EXPIRATION)))){
           // L2キャッシュにない場合、またはL2キャッシュが期限切れの場合
-          //console.log("l2 cache expired");
           fetch_flag = true;
         }else{
-          //console.log("l2 cache hit");
           data = await parser(response);
           expiration = Number.parseInt(response.headers.get(HEADER_EXPIRATION));
           
