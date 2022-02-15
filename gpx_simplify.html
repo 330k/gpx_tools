@@ -802,7 +802,7 @@ async function addElevationGSI(gpxdocs){
           // L1キャッシュで期限切れ
           fetch_flag = true;
         }else{
-          // L1キャッシュの先頭に移動(LRU)
+          // L1キャッシュの末尾に移動(LRU)
           l1_cache.delete(url);
           l1_cache.set(url, v);
           data = v.data;
@@ -845,7 +845,7 @@ async function addElevationGSI(gpxdocs){
       }
       
       if(l1_update_flag){
-        // L1キャッシュの先頭に保存
+        // L1キャッシュの末尾に保存
         l1_cache.set(url, {
           data: data,
           expire_on: expiration
