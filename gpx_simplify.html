@@ -766,7 +766,7 @@ async function addElevationGSI(gpxdocs){
    */
   function LayeredCache(cache_name, parser, l1_cache_size = 1000, cache_expiration = 30 * 86400 * 1000){
     const HEADER_EXPIRATION = "_expire_on";
-    const l1_cache = [];
+    const l1_cache = new Map();
     let l2_cache = null;
     let prepared = false;
     
@@ -794,22 +794,22 @@ async function addElevationGSI(gpxdocs){
         throw new Exception("Cache API not ready");
       }
       
-      let idx = l1_cache.findIndex((e) => e.url === url);
-      if(idx >= 0){
+      if(l1_cache.has(url)){
         // L1キャッシュにヒット
-        // L1キャッシュの先頭に移動(LRU)
-        l1_cache.unshift(l1_cache.splice(idx, 1)[0]);
+        const v = l1_cache.get(url);
 
-        if(now > l1_cache[0].expire_on){
+        if(now > v.expire_on){
           // L1キャッシュで期限切れ
-          l1_cache.shift();
           fetch_flag = true;
         }else{
-          data = l1_cache[0].data;
+          // L1キャッシュの先頭に移動(LRU)
+          l1_cache.delete(url);
+          l1_cache.set(url, v);
+          data = v.data;
         }
 
       }else{
-        let response = await l2_cache.match(url);
+        const response = await l2_cache.match(url);
         
         if((response === undefined)
           || response.headers.get(HEADER_EXPIRATION) === null
@@ -826,7 +826,7 @@ async function addElevationGSI(gpxdocs){
       
       if(fetch_flag){
         // 通信して取得する
-        response = await fetch(url);
+        const response = await fetch(url);
         
         const copy = response.clone();
         const headers = new Headers(copy.headers);
@@ -846,13 +846,12 @@ async function addElevationGSI(gpxdocs){
       
       if(l1_update_flag){
         // L1キャッシュの先頭に保存
-        l1_cache.unshift({
-          url: url,
+        l1_cache.set(url, {
           data: data,
           expire_on: expiration
         });
         if(l1_cache.length > l1_cache_size){
-          l1_cache.length = l1_cache_size;
+          l1_cache.delete(l1_cache.keys().next().value);
         }
       }
       
