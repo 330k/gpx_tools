@@ -4,18 +4,12 @@
 <meta charset="utf-8">
 <title>GPX to TCX Converter</title>
 <meta property="og:title" content="GPX to TCX Converter" />
-<meta property="og:description" content="2つのGPXルートで差異がある点を強調表示するツールです" />
+<meta property="og:description" content="GPXからTCXファイルに変換するツールです。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.330k.info/software/rakuten-hotel-search/rakuten-hotel-search.html" />
 <meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
 <!--<meta name="viewport" content="width=640">-->
 <script>
-const googlemap = {
-  map: null,
-  lines: [],
-  dist_marker: null
-};
-
 /**
  * Hubeny測地線距離計算式
  * @param {number} lat1
@@ -223,7 +217,6 @@ function convertGPXtoTCX(gpx){
     };
     for(let j = 0; j < coords.length - 1; j++){
       let v = segmentPointDistance(coords[j].lat, coords[j].lng, coords[j + 1].lat, coords[j + 1].lng, lat, lng);
-      //console.log(v);
       
       if(v.dist < nearest.dist_dev){
         nearest.index = j;
@@ -289,108 +282,17 @@ function downloadTCX(contents, filename){
   e.click();
 }
 
-/**
- * GPXデータのルートをGoogle Mapsに表示
- * @param {Object} map
- * @param {[{lat:number,lng:number,dist:number}]} coords
- * @param {string} color
- * @return {void}
- */
-function showGPXRoute(map, coords, color, filename){
-  // 表示用のPolyline
-  const line_display = new google.maps.Polyline({
-    path: coords,
-    geodesic: true,
-    strokeColor: color,
-    strokeOpacity: 1,
-    strokeWeight: 2
-  });
-  // マウスイベントを拾うための透明なPolyline
-  const line_transparent = new google.maps.Polyline({
-    path: coords,
-    geodesic: true,
-    strokeColor: color,
-    strokeOpacity: 0,
-    strokeWeight: 30
-  });
-
-  const dist_info = document.getElementById("dist_info");
-
-  line_transparent.addListener("mousemove", function(evt){
-    // GPXトラック上にマウスが来たときは距離を表示する
-    const lat = evt.latLng.lat();
-    const lng = evt.latLng.lng();
-    let dist_min = Number.MAX_VALUE;
-    let index_min = -1;
-
-    for(let i = 0; i < coords.length; i++){
-      let d = hubeny(coords[i].lat, coords[i].lng, lat, lng);
-      if(d < dist_min){
-        index_min = i;
-        dist_min = d;
-      };
-    }
-
-    //console.log(coords[index_min]);
-    //console.log(evt);
-    if(googlemap.dist_marker){
-      googlemap.dist_marker.setPosition(coords[index_min]);
-
-    }else{
-      googlemap.dist_marker = new google.maps.Marker({
-        position: coords[index_min],
-        icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 5,
-            fillColor: color,
-            fillOpacity: 0.5,
-            strokeColor: color,
-            strokeOpacity: 1,
-            strokeWeight: 1
-        },
-        map: googlemap.map
-      });
-    }
-
-    dist_info.innerHTML = filename + ": " + (0.001 * coords[index_min].dist).toFixed(1) + " km";
-    dist_info.style.display = "block";
-    dist_info.style.left = evt.domEvent.pageX - dist_info.clientWidth * 0.5;
-    dist_info.style.top = evt.domEvent.pageY - dist_info.clientHeight - 20;
-
-  });
-  line_transparent.addListener("mouseout", function(evt){
-    dist_info.style.display = "none";
-    if(googlemap.dist_marker){
-      googlemap.dist_marker.setMap(null);
-      googlemap.dist_marker = null;
-    }
-  });
-  
-  googlemap.lines.push(line_display);
-  line_display.setMap(map);
-  googlemap.lines.push(line_transparent);
-  line_transparent.setMap(map);
-}
-
 window.addEventListener("DOMContentLoaded", function(){
   // GPX読み込み(基準ルート)
   document.getElementById("gpx_file").addEventListener("change", async function(evt){
     try{
       showLoader();
 
-      googlemap.lines.map((e) => {
-        e.setMap(null);
-      });
-
-      const color = "#3f3d9a";
-      const file = evt.target.files[0];
-      const gpx = await readGPX(file);
-      //const route_base = parseGPX(gpx);
-      //showGPXRoute(googlemap.map, route_base, color, file.name);
-      
-      const tcx = convertGPXtoTCX(gpx);
-      //console.log(tcx);
-      downloadTCX(tcx, file.name.replace(/\.gpx/i, ".tcx"));
+      for(const file of evt.target.files){
+        const gpx = await readGPX(file);
+        const tcx = convertGPXtoTCX(gpx);
+        downloadTCX(tcx, file.name.replace(/\.gpx/i, ".tcx"));
+      }
 
     }catch(err){
       console.error(err);
@@ -439,16 +341,6 @@ function showLoader(){
   document.getElementById("loader_bg").style.display = "block";
 }
 </script>
-<script type="application/javascript">
-var doNotTrack = false;
-if (!doNotTrack) {
-  window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
-  ga('create', 'UA-5655726-3', 'auto');
-  
-  ga('send', 'pageview');
-}
-</script>
-<script async src='https://www.google-analytics.com/analytics.js'></script>
 <style>
 * { margin: 0; padding: 0}
 #wrapper {
@@ -501,7 +393,7 @@ if (!doNotTrack) {
 <div id="wrapper">
 <h1>GPX to TCX Converter</h1>
 <div>GPXファイルをドロップすると、自動的にTCXファイルに変換します。変換後は自動的にダウンロードを開始します。</div>
-<input type="file" id="gpx_file" accept=".gpx" />
+<input type="file" id="gpx_file" accept=".gpx" multiple/>
 </div>
 <div id="loader_bg">
 <div id="loader">
