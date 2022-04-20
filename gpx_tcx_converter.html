@@ -1,0 +1,514 @@
+
+<html>
+<head>
+<meta charset="utf-8">
+<title>GPX to TCX Converter</title>
+<meta property="og:title" content="GPX to TCX Converter" />
+<meta property="og:description" content="2つのGPXルートで差異がある点を強調表示するツールです" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://www.330k.info/software/rakuten-hotel-search/rakuten-hotel-search.html" />
+<meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
+<!--<meta name="viewport" content="width=640">-->
+<script>
+const googlemap = {
+  map: null,
+  lines: [],
+  dist_marker: null
+};
+
+/**
+ * Hubeny測地線距離計算式
+ * @param {number} lat1
+ * @param {number} lon1
+ * @param {number} lat2
+ * @param {number} lon2
+ * @return {number} distance [m]
+ */
+ const hubeny = (function(){
+  const a = 6378137.0;
+  const f = 1 / 298.257223563;
+  const e2 = f * (2 - f);
+  const degree = Math.PI / 180.0;
+  const sin = Math.sin;
+  const cos = Math.cos;
+  const sqrt = Math.sqrt;
+  return function (lat1, lon1, lat2, lon2){
+    const latdiff = (lat1 - lat2) * degree;
+    const londiff = (lon1 - lon2) * degree;
+    const latave = 0.5 * (lat1 + lat2) * degree;
+    const sinlatave = sin(latave);
+    const coslatave = cos(latave);
+    const w2 = 1.0 - sinlatave * sinlatave * e2;
+    const w = sqrt(w2);
+    const meridian = a * (1 - e2) / (w2 * w);
+    const n = a / w;
+
+    return sqrt(
+      latdiff * latdiff * meridian * meridian +
+      londiff * londiff * n * n * coslatave * coslatave
+    );
+  };
+})();
+
+/**
+ * GPXファイルを読み込むPromiseを返す
+ * @param {string} file 読み込むファイル
+ * @return {XMLDocument} 読み込んだ結果をXMLObjectを返すPromise
+ */
+function readGPX(file){
+  return new Promise(function(resolve, reject){
+    try{
+      const reader = new FileReader();
+      const parser = new DOMParser();
+
+      reader.onload = function(){
+        resolve(parser.parseFromString(reader.result, "text/xml"));
+      };
+      reader.readAsText(file, "utf-8");
+      
+    }catch(e){
+      reject(e);
+    }
+  });
+}
+
+/**
+ * GPXファイルを解析して、緯度、経度、距離の配列にする
+ * @param {XMLDocument} gpx
+ * @return {[{lat:number,lng:number,dist:number}]}
+ */
+function parseGPX(gpx){
+  const trkpts = gpx.querySelectorAll("trkpt");
+  if(trkpts.length === 0){
+    return;
+  }
+
+  const coords = [{
+    lat: trkpts[0].getAttribute("lat") - 0,
+    lng: trkpts[0].getAttribute("lon") - 0,
+    dist: 0.0
+  }];
+
+  let d = 0.0;
+  for(let i = 1; i < trkpts.length; i++){
+    let lat = trkpts[i].getAttribute("lat") - 0;
+    let lng = trkpts[i].getAttribute("lon") - 0;
+
+    d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
+    coords.push({
+      lat: lat,
+      lng: lng,
+      dist: d
+    });
+  }
+  
+  return coords;
+}
+
+/**
+ * GPXファイルをTCXに変換する
+ * @param {XMLDocument} gpx
+ * @return {[{lat:number,lng:number,dist:number}]}
+ */
+function convertGPXtoTCX(gpx){
+  const speed = 15.0 / 3.6; // [m/s]
+  const date_start = Date.now();
+  const buf = [];
+  
+  const trkpts = gpx.querySelectorAll("trkpt");
+  if(trkpts.length === 0){
+    return;
+  }
+
+  // trkpts要素を列挙
+  const coords = [{
+    lat: trkpts[0].getAttribute("lat") - 0,
+    lng: trkpts[0].getAttribute("lon") - 0,
+    ele: trkpts[0].querySelector("ele").textContent - 0,
+    dist: 0.0
+  }];
+
+  let d = 0.0;
+  for(let i = 1; i < trkpts.length; i++){
+    let lat = trkpts[i].getAttribute("lat") - 0;
+    let lng = trkpts[i].getAttribute("lon") - 0;
+    let ele = trkpts[i].querySelector("ele").textContent - 0;
+
+    d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
+    coords.push({
+      lat: lat,
+      lng: lng,
+      ele: ele,
+      dist: d
+    });
+  }
+  
+  
+  const name = gpx.querySelector("trk > name").textContent;
+
+  buf.push('<?xml version="1.0" encoding="UTF-8"?>');
+  buf.push('<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www8.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd">');
+  buf.push('<Folders><Courses><CourseFolder Name="330k.info"><CourseNameRef><Id>' + name + '</Id></CourseNameRef></CourseFolder></Courses></Folders>');
+  buf.push('<Courses>');
+  buf.push('  <Course>');
+  buf.push('    <Name>' + name + '</Name>');
+  buf.push('    <Lap>');
+  buf.push('      <TotalTimeSeconds>' + (d / speed).toFixed(1) + '</TotalTimeSeconds>');
+  buf.push('      <DistanceMeters>' + d.toFixed(8) + '</DistanceMeters>');
+  buf.push('      <BeginPosition>');
+  buf.push('        <LatitudeDegrees>' + coords[0].lat.toFixed(8) + '</LatitudeDegrees>');
+  buf.push('        <LongitudeDegrees>' + coords[0].lng.toFixed(8) + '</LongitudeDegrees>');
+  buf.push('      </BeginPosition>');
+  buf.push('      <EndPosition>');
+  buf.push('        <LatitudeDegrees>' + coords[coords.length - 1].lat.toFixed(8) + '</LatitudeDegrees>');
+  buf.push('        <LongitudeDegrees>' + coords[coords.length - 1].lng.toFixed(8) + '</LongitudeDegrees>');
+  buf.push('      </EndPosition>');
+  buf.push('      <Intensity>Active</Intensity>');
+  buf.push('    </Lap>');
+  buf.push('    <Track>');
+  
+  for(const p of coords){
+    let time = new Date(date_start);
+    time.setMilliseconds(p.dist / speed * 1000);
+    buf.push('      <Trackpoint>');
+    buf.push('        <Time>' + time.toISOString() + '</Time>');
+    buf.push('        <Position>');
+    buf.push('          <LatitudeDegrees>' + p.lat.toFixed(8) + '</LatitudeDegrees>');
+    buf.push('          <LongitudeDegrees>' + p.lng.toFixed(8) + '</LongitudeDegrees>');
+    buf.push('        </Position>');
+    buf.push('        <AltitudeMeters>' + p.ele.toFixed(3) + '</AltitudeMeters>');
+    buf.push('        <DistanceMeters>' + p.dist.toFixed(3) + '</DistanceMeters>');
+    buf.push('      </Trackpoint>');
+  }
+  
+  buf.push('    </Track>');
+  
+  function segmentPointDistance(ax, ay, bx, by, px, py){
+    const t = (ax * ax + ay * ay + bx * px - ax * (bx + px) + by * py - ay * (by + py))/(ax * ax + ay * ay - 2 * ax * bx + bx * bx - 2 * ay * by + by * by);
+    const x = ax - (ax - bx) * t;
+    const y = ay - (ay - by) * t;
+    
+    if((0 <= t) && (t <= 1)){
+      return {
+        t: t,
+        dist: ((x - px) * (x - px) + (y - py) * (y - py))
+      };
+    }else if(t > 1){
+      return {
+        t: t,
+        dist: ((bx - px) * (bx - px) + (by - py) * (by - py))
+      };
+    }else{
+      // includes A == B
+      return {
+        t: t,
+        dist: ((ax - px) * (ax - px) + (ay - py) * (ay - py))
+      };
+    }
+  }
+  
+  // wpt要素を列挙
+  const wpts = gpx.querySelectorAll("wpt");
+  const coursepoints = [];
+  
+  for(let i = 0; i < wpts.length; i++){
+    let lat = wpts[i].getAttribute("lat") - 0;
+    let lng = wpts[i].getAttribute("lon") - 0;
+    
+    // コースポイントの距離を判定
+    let nearest = {
+      index: -1,
+      t: 0,
+      dist_dev: Number.MAX_VALUE
+    };
+    for(let j = 0; j < coords.length - 1; j++){
+      let v = segmentPointDistance(coords[j].lat, coords[j].lng, coords[j + 1].lat, coords[j + 1].lng, lat, lng);
+      //console.log(v);
+      
+      if(v.dist < nearest.dist_dev){
+        nearest.index = j;
+        nearest.t = v.t;
+        nearest.dist_dev = v.dist;
+      }
+    }
+    console.log(nearest);
+    let dist = (1 - nearest.t) * coords[nearest.index].dist + nearest.t * coords[nearest.index + 1].dist;
+    let time = new Date(date_start);
+    time.setMilliseconds(dist / speed * 1000);
+    
+    coursepoints.push({
+      name: wpts[i].querySelector("name").textContent,
+      lat: lat,
+      lng: lng,
+      dist: dist,
+      time: time
+    });
+  }
+  
+  // 距離順に並び替える(そうしないとEdgeが正しく認識しない)
+  coursepoints.sort((a, b) => a.dist - b.dist);
+  
+  for(let i = 0; i < coursepoints.length; i++){
+    buf.push('    <CoursePoint>');
+    buf.push('      <Name>' + coursepoints[i].name + '</Name>');
+    buf.push('      <Time>' + coursepoints[i].time.toISOString() + '</Time>');
+    buf.push('      <Position>');
+    buf.push('        <LatitudeDegrees>' + coursepoints[i].lat.toFixed(8) + '</LatitudeDegrees>');
+    buf.push('        <LongitudeDegrees>' + coursepoints[i].lng.toFixed(8) + '</LongitudeDegrees>');
+    buf.push('      </Position>');
+    buf.push('      <PointType>Generic</PointType>');
+    buf.push('    </CoursePoint>');
+  }
+  
+  buf.push('  </Course>');
+  buf.push('</Courses>');
+  buf.push('</TrainingCenterDatabase>');
+
+  
+  return buf.join("\n");
+}
+
+function downloadTCX(contents, filename){
+  const e = document.createElement("a");
+  let blob;
+  
+  try{
+    blob = new Blob([contents], {type:"application/xml"});
+    
+  }catch(err){
+    let bb = new BlobBuilder();
+    bb.append(contents);
+    blob = bb.getBlob("application/xml");
+    
+  }
+  e.href = window.URL.createObjectURL(blob);
+  e.setAttribute("target", "_blank");
+  e.setAttribute("download", filename);
+  document.body.appendChild(e);
+  
+  e.click();
+}
+
+/**
+ * GPXデータのルートをGoogle Mapsに表示
+ * @param {Object} map
+ * @param {[{lat:number,lng:number,dist:number}]} coords
+ * @param {string} color
+ * @return {void}
+ */
+function showGPXRoute(map, coords, color, filename){
+  // 表示用のPolyline
+  const line_display = new google.maps.Polyline({
+    path: coords,
+    geodesic: true,
+    strokeColor: color,
+    strokeOpacity: 1,
+    strokeWeight: 2
+  });
+  // マウスイベントを拾うための透明なPolyline
+  const line_transparent = new google.maps.Polyline({
+    path: coords,
+    geodesic: true,
+    strokeColor: color,
+    strokeOpacity: 0,
+    strokeWeight: 30
+  });
+
+  const dist_info = document.getElementById("dist_info");
+
+  line_transparent.addListener("mousemove", function(evt){
+    // GPXトラック上にマウスが来たときは距離を表示する
+    const lat = evt.latLng.lat();
+    const lng = evt.latLng.lng();
+    let dist_min = Number.MAX_VALUE;
+    let index_min = -1;
+
+    for(let i = 0; i < coords.length; i++){
+      let d = hubeny(coords[i].lat, coords[i].lng, lat, lng);
+      if(d < dist_min){
+        index_min = i;
+        dist_min = d;
+      };
+    }
+
+    //console.log(coords[index_min]);
+    //console.log(evt);
+    if(googlemap.dist_marker){
+      googlemap.dist_marker.setPosition(coords[index_min]);
+
+    }else{
+      googlemap.dist_marker = new google.maps.Marker({
+        position: coords[index_min],
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 5,
+            fillColor: color,
+            fillOpacity: 0.5,
+            strokeColor: color,
+            strokeOpacity: 1,
+            strokeWeight: 1
+        },
+        map: googlemap.map
+      });
+    }
+
+    dist_info.innerHTML = filename + ": " + (0.001 * coords[index_min].dist).toFixed(1) + " km";
+    dist_info.style.display = "block";
+    dist_info.style.left = evt.domEvent.pageX - dist_info.clientWidth * 0.5;
+    dist_info.style.top = evt.domEvent.pageY - dist_info.clientHeight - 20;
+
+  });
+  line_transparent.addListener("mouseout", function(evt){
+    dist_info.style.display = "none";
+    if(googlemap.dist_marker){
+      googlemap.dist_marker.setMap(null);
+      googlemap.dist_marker = null;
+    }
+  });
+  
+  googlemap.lines.push(line_display);
+  line_display.setMap(map);
+  googlemap.lines.push(line_transparent);
+  line_transparent.setMap(map);
+}
+
+window.addEventListener("DOMContentLoaded", function(){
+  // GPX読み込み(基準ルート)
+  document.getElementById("gpx_file").addEventListener("change", async function(evt){
+    try{
+      showLoader();
+
+      googlemap.lines.map((e) => {
+        e.setMap(null);
+      });
+
+      const color = "#3f3d9a";
+      const file = evt.target.files[0];
+      const gpx = await readGPX(file);
+      //const route_base = parseGPX(gpx);
+      //showGPXRoute(googlemap.map, route_base, color, file.name);
+      
+      const tcx = convertGPXtoTCX(gpx);
+      //console.log(tcx);
+      downloadTCX(tcx, file.name.replace(/\.gpx/i, ".tcx"));
+
+    }catch(err){
+      console.error(err);
+
+    }finally{
+      hideLoader();
+      
+    }
+  });
+  
+  // ドラッグドロップ対応
+  {
+    const droparea = document.body;
+    const overlay = document.getElementById("overlay");
+    droparea.addEventListener("dragover", function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      overlay.style.display = "block";
+    }, false);
+    overlay.addEventListener("dragleave", function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      overlay.style.display = "none";
+    }, false);
+    overlay.addEventListener("drop", function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      overlay.style.display = "none";
+      
+      const files = e.dataTransfer.files;
+      document.getElementById("gpx_file").files = files;
+
+      const evt = new Event("change");
+      document.getElementById("gpx_file").dispatchEvent(evt);
+    }, false)
+  };
+  
+  hideLoader();
+});
+
+function hideLoader(){
+  document.getElementById("loader_bg").style.display = "none";
+}
+
+function showLoader(){
+  document.getElementById("loader_bg").style.display = "block";
+}
+</script>
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+  window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+  ga('create', 'UA-5655726-3', 'auto');
+  
+  ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+<style>
+* { margin: 0; padding: 0}
+#wrapper {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#loader_bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(1, 1, 1, 0.25);
+  z-index: 9999;
+}
+#loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px;
+  border-radius: 30px;
+  background: #ddd;
+}
+
+#gpx_file { 
+  /*display: none;*/
+}
+
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  background-color: #ddd;
+  opacity: 0.5;
+  display: none;
+}
+
+.dropover {
+  background-color: rgba(240, 240, 240, 0.5);
+  display: block;
+}
+</style>
+</head>
+<body>
+<div id="wrapper">
+<h1>GPX to TCX Converter</h1>
+<div>GPXファイルをドロップすると、自動的にTCXファイルに変換します。変換後は自動的にダウンロードを開始します。</div>
+<input type="file" id="gpx_file" accept=".gpx" />
+</div>
+<div id="loader_bg">
+<div id="loader">
+<img src="data:image/svg+xml,%3Csvg width='32' height='32' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid' class='uil-spin'%3E%3Cpath fill='none' class='bk' d='M0 0h100v100H0z'/%3E%3Cg transform='translate(84 50)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(45 -52.355 126.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.12s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.12s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(90 -17 67)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.25s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.25s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(135 -2.355 42.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.37s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.37s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(180 8 25)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.5s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.5s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-135 18.355 7.603)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.62s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.62s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-90 33 -17)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.75s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.75s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-45 68.355 -76.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.87s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.87s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E" width="128" height="128">
+</div>
+</div>
+<div id="overlay"></div>
+<div id="dist_info"></div>
+</body>
+</html>
