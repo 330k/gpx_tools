@@ -6,7 +6,7 @@
 <meta property="og:title" content="GPX to TCX Converter" />
 <meta property="og:description" content="GPXからTCXファイルに変換するツールです。wpt要素をCoursePoint要素に変換します。" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://www.330k.info/software/rakuten-hotel-search/rakuten-hotel-search.html" />
+<meta property="og:url" content="https://www.330k.info/" />
 <meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
 <!--<meta name="viewport" content="width=640">-->
 <script>
@@ -254,10 +254,11 @@ window.addEventListener("DOMContentLoaded", function(){
   document.getElementById("gpx_file").addEventListener("change", async function(evt){
     try{
       showLoader();
+      const speed = (document.getElementById("input_speed").value - 0) / 3.6;
 
       for(const file of evt.target.files){
         const gpx = await readGPX(file);
-        const tcx = convertGPXtoTCX(gpx);
+        const tcx = convertGPXtoTCX(gpx, speed);
         downloadTCX(tcx, file.name.replace(/\.gpx/i, ".tcx"));
       }
 
@@ -367,7 +368,7 @@ function showLoader(){
  </div>
  <div class="pure-control-group">
   <label for="input_speed">移動速度</label>
-  <input type="number" id="speed" value="15" min="1" max="99">
+  <input type="number" id="input_speed" value="15" min="1" max="99">
   <span>[m/s]</span>
  </div>
  <p>GPXファイルをドロップすると、自動的にTCXファイルに変換します。<br>変換後は自動的にダウンロードを開始します。</p>
