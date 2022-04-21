@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>GPX to TCX Converter</title>
 <meta property="og:title" content="GPX to TCX Converter" />
-<meta property="og:description" content="GPXからTCXファイルに変換するツールです。" />
+<meta property="og:description" content="GPXからTCXファイルに変換するツールです。wpt要素をCoursePoint要素に変換します。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.330k.info/software/rakuten-hotel-search/rakuten-hotel-search.html" />
 <meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
@@ -18,7 +18,7 @@
  * @param {number} lon2
  * @return {number} distance [m]
  */
- const hubeny = (function(){
+const hubeny = (function(){
   const a = 6378137.0;
   const f = 1 / 298.257223563;
   const e2 = f * (2 - f);
@@ -67,45 +67,12 @@ function readGPX(file){
 }
 
 /**
- * GPXファイルを解析して、緯度、経度、距離の配列にする
- * @param {XMLDocument} gpx
- * @return {[{lat:number,lng:number,dist:number}]}
- */
-function parseGPX(gpx){
-  const trkpts = gpx.querySelectorAll("trkpt");
-  if(trkpts.length === 0){
-    return;
-  }
-
-  const coords = [{
-    lat: trkpts[0].getAttribute("lat") - 0,
-    lng: trkpts[0].getAttribute("lon") - 0,
-    dist: 0.0
-  }];
-
-  let d = 0.0;
-  for(let i = 1; i < trkpts.length; i++){
-    let lat = trkpts[i].getAttribute("lat") - 0;
-    let lng = trkpts[i].getAttribute("lon") - 0;
-
-    d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
-    coords.push({
-      lat: lat,
-      lng: lng,
-      dist: d
-    });
-  }
-  
-  return coords;
-}
-
-/**
  * GPXファイルをTCXに変換する
  * @param {XMLDocument} gpx
+ * @param {number} speed 計算に使用する移動速度 [m/s]
  * @return {[{lat:number,lng:number,dist:number}]}
  */
-function convertGPXtoTCX(gpx){
-  const speed = 15.0 / 3.6; // [m/s]
+function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
   const date_start = Date.now();
   const buf = [];
   
@@ -341,8 +308,9 @@ function showLoader(){
   document.getElementById("loader_bg").style.display = "block";
 }
 </script>
+<link rel="stylesheet" href="https://unpkg.com/purecss@2.1.0/build/pure-min.css" integrity="sha384-yHIFVG6ClnONEA5yB5DJXfW2/KC173DIQrYoZMEtBvGzmf0PKiGyNEqe9N6BNDBH" crossorigin="anonymous">
 <style>
-* { margin: 0; padding: 0}
+/* * { margin: 0; padding: 0}*/
 #wrapper {
   width: 100%;
   height: 100%;
@@ -392,8 +360,17 @@ function showLoader(){
 <body>
 <div id="wrapper">
 <h1>GPX to TCX Converter</h1>
-<div>GPXファイルをドロップすると、自動的にTCXファイルに変換します。変換後は自動的にダウンロードを開始します。</div>
-<input type="file" id="gpx_file" accept=".gpx" multiple/>
+<div class="pure-form pure-form-aligned">
+ <div class="pure-control-group">
+  <label for="gpx_file">GPXファイル</label>
+  <input type="file" id="gpx_file" accept=".gpx" multiple>
+ </div>
+ <div class="pure-control-group">
+  <label for="input_speed">移動速度</label>
+  <input type="number" id="speed" value="15" min="1" max="99">
+  <span>[m/s]</span>
+ </div>
+ <p>GPXファイルをドロップすると、自動的にTCXファイルに変換します。<br>変換後は自動的にダウンロードを開始します。</p>
 </div>
 <div id="loader_bg">
 <div id="loader">
