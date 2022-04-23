@@ -45,6 +45,68 @@ const hubeny = (function(){
 })();
 
 /**
+ * 緯度経度から地心直交座標系(X, Y, Z)に変換
+ */
+function latlon2XYZ(lat, lon){
+  const a = 6378137.0;
+  const b = 6356752.314245;
+  const f2 = b * b / (a * a);
+  const e2 = 1.0 - f2;
+  const degree = Math.PI / 180.0;
+  
+  const latrad = lat * degree;
+  const lonrad = lon * degree;
+  
+  const sinlat = Math.sin(latrad);
+  const coslat = Math.cos(latrad);
+  const sinlon = Math.sin(lonrad);
+  const coslon = Math.cos(lonrad);
+  
+  const w2 = 1.0 - sinlat * sinlat * e2;
+  const w = Math.sqrt(w2)
+  const N = a / w;
+  const h = 0.0;
+  
+  return {
+    "X": (N + h) * coslat * coslon,
+    "Y": (N + h) * coslat * sinlon,
+    "Z": N * f2 * sinlat,
+  };
+}
+
+/**
+ * 線分と点の距離、線分上の最短距離を与える点の座標、内分比を返す(3次元)
+ */
+function segmentPointDistance3D(ax, ay, az, bx, by, bz, px, py, pz){
+  const t = (ax * ax + ay * ay + bx * px - ax * (bx + px) + by * py - ay * (by + py) + (az - bz) * (az - pz))/((ax - bx) * (ax - bx) + (ay - by) * (ay - by) + (az - bz) * (az - bz));
+  let x;
+  let y;
+  let z;
+  
+  if((0 <= t) && (t <= 1)){
+    x = ax - (ax - bx) * t;
+    y = ay - (ay - by) * t;
+    z = az - (az - bz) * t;
+  }else if(t > 1){
+    x = bx;
+    y = by;
+    z = bz;
+  }else{
+    // includes A == B
+    x = ax;
+    y = ay;
+    z = az;
+  }
+  return {
+    "dist": Math.sqrt((x - px) * (x - px) + (y - py) * (y - py) + (z - pz) * (z - pz)),
+    "x": x,
+    "y": y,
+    "z": z,
+    "t": t
+  };
+}
+
+/**
  * GPXファイルを読み込むPromiseを返す
  * @param {string} file 読み込むファイル
  * @return {XMLDocument} 読み込んだ結果をXMLObjectを返すPromise
@@ -70,7 +132,7 @@ function readGPX(file){
  * GPXファイルをTCXに変換する
  * @param {XMLDocument} gpx
  * @param {number} speed 計算に使用する移動速度 [m/s]
- * @return {[{lat:number,lng:number,dist:number}]}
+ * @return {[{lat:number,lon:number,dist:number}]}
  */
 function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
   const date_start = Date.now();
@@ -82,25 +144,26 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
   }
 
   // trkpts要素を列挙
-  const coords = [{
-    lat: trkpts[0].getAttribute("lat") - 0,
-    lng: trkpts[0].getAttribute("lon") - 0,
-    ele: trkpts[0].querySelector("ele").textContent - 0,
-    dist: 0.0
-  }];
+  const coords = [];
 
   let d = 0.0;
-  for(let i = 1; i < trkpts.length; i++){
+  for(let i = 0; i < trkpts.length; i++){
     let lat = trkpts[i].getAttribute("lat") - 0;
-    let lng = trkpts[i].getAttribute("lon") - 0;
+    let lon = trkpts[i].getAttribute("lon") - 0;
     let ele = trkpts[i].querySelector("ele").textContent - 0;
+    let XYZ = latlon2XYZ(lat, lon);
 
-    d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
+    if(i >= 1){
+      d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lon, lat, lon);
+    }
     coords.push({
       lat: lat,
-      lng: lng,
+      lon: lon,
       ele: ele,
-      dist: d
+      dist: d,
+      X: XYZ.X,
+      Y: XYZ.Y,
+      Z: XYZ.Z,
     });
   }
   
@@ -118,11 +181,11 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
   buf.push('      <DistanceMeters>' + d.toFixed(8) + '</DistanceMeters>');
   buf.push('      <BeginPosition>');
   buf.push('        <LatitudeDegrees>' + coords[0].lat.toFixed(8) + '</LatitudeDegrees>');
-  buf.push('        <LongitudeDegrees>' + coords[0].lng.toFixed(8) + '</LongitudeDegrees>');
+  buf.push('        <LongitudeDegrees>' + coords[0].lon.toFixed(8) + '</LongitudeDegrees>');
   buf.push('      </BeginPosition>');
   buf.push('      <EndPosition>');
   buf.push('        <LatitudeDegrees>' + coords[coords.length - 1].lat.toFixed(8) + '</LatitudeDegrees>');
-  buf.push('        <LongitudeDegrees>' + coords[coords.length - 1].lng.toFixed(8) + '</LongitudeDegrees>');
+  buf.push('        <LongitudeDegrees>' + coords[coords.length - 1].lon.toFixed(8) + '</LongitudeDegrees>');
   buf.push('      </EndPosition>');
   buf.push('      <Intensity>Active</Intensity>');
   buf.push('    </Lap>');
@@ -135,7 +198,7 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
     buf.push('        <Time>' + time.toISOString() + '</Time>');
     buf.push('        <Position>');
     buf.push('          <LatitudeDegrees>' + p.lat.toFixed(8) + '</LatitudeDegrees>');
-    buf.push('          <LongitudeDegrees>' + p.lng.toFixed(8) + '</LongitudeDegrees>');
+    buf.push('          <LongitudeDegrees>' + p.lon.toFixed(8) + '</LongitudeDegrees>');
     buf.push('        </Position>');
     buf.push('        <AltitudeMeters>' + p.ele.toFixed(3) + '</AltitudeMeters>');
     buf.push('        <DistanceMeters>' + p.dist.toFixed(3) + '</DistanceMeters>');
@@ -144,37 +207,14 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
   
   buf.push('    </Track>');
   
-  function segmentPointDistance(ax, ay, bx, by, px, py){
-    const t = (ax * ax + ay * ay + bx * px - ax * (bx + px) + by * py - ay * (by + py))/(ax * ax + ay * ay - 2 * ax * bx + bx * bx - 2 * ay * by + by * by);
-    const x = ax - (ax - bx) * t;
-    const y = ay - (ay - by) * t;
-    
-    if((0 <= t) && (t <= 1)){
-      return {
-        t: t,
-        dist: ((x - px) * (x - px) + (y - py) * (y - py))
-      };
-    }else if(t > 1){
-      return {
-        t: t,
-        dist: ((bx - px) * (bx - px) + (by - py) * (by - py))
-      };
-    }else{
-      // includes A == B
-      return {
-        t: t,
-        dist: ((ax - px) * (ax - px) + (ay - py) * (ay - py))
-      };
-    }
-  }
-  
   // wpt要素を列挙
   const wpts = gpx.querySelectorAll("wpt");
   const coursepoints = [];
   
   for(let i = 0; i < wpts.length; i++){
     let lat = wpts[i].getAttribute("lat") - 0;
-    let lng = wpts[i].getAttribute("lon") - 0;
+    let lon = wpts[i].getAttribute("lon") - 0;
+    let XYZ = latlon2XYZ(lat, lon);
     
     // コースポイントの距離を判定
     let nearest = {
@@ -183,7 +223,7 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
       dist_dev: Number.MAX_VALUE
     };
     for(let j = 0; j < coords.length - 1; j++){
-      let v = segmentPointDistance(coords[j].lat, coords[j].lng, coords[j + 1].lat, coords[j + 1].lng, lat, lng);
+      let v = segmentPointDistance3D(coords[j].X, coords[j].Y, coords[j].Z, coords[j + 1].X, coords[j + 1].Y, coords[j + 1].Z, XYZ.X, XYZ.Y, XYZ.Z);
       
       if(v.dist < nearest.dist_dev){
         nearest.index = j;
@@ -199,7 +239,7 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
     coursepoints.push({
       name: wpts[i].querySelector("name").textContent,
       lat: lat,
-      lng: lng,
+      lon: lon,
       dist: dist,
       time: time
     });
@@ -214,7 +254,7 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
     buf.push('      <Time>' + coursepoints[i].time.toISOString() + '</Time>');
     buf.push('      <Position>');
     buf.push('        <LatitudeDegrees>' + coursepoints[i].lat.toFixed(8) + '</LatitudeDegrees>');
-    buf.push('        <LongitudeDegrees>' + coursepoints[i].lng.toFixed(8) + '</LongitudeDegrees>');
+    buf.push('        <LongitudeDegrees>' + coursepoints[i].lon.toFixed(8) + '</LongitudeDegrees>');
     buf.push('      </Position>');
     buf.push('      <PointType>Generic</PointType>');
     buf.push('    </CoursePoint>');
@@ -371,7 +411,7 @@ function showLoader(){
   <input type="number" id="input_speed" value="15" min="1" max="99">
   <span>[m/s]</span>
  </div>
- <p>GPXファイルをドロップすると、自動的にTCXファイルに変換します。<br>変換後は自動的にダウンロードを開始します。</p>
+ <p>GPXファイルを選択 or ドロップすると、自動的にTCXファイルに変換します。<br>変換後は自動的にダウンロードを開始します。</p>
 </div>
 <div id="loader_bg">
 <div id="loader">
