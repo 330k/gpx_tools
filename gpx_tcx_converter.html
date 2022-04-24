@@ -159,9 +159,12 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
   for(let i = 0; i < trkpts.length; i++){
     let lat = trkpts[i].getAttribute("lat") - 0;
     let lon = trkpts[i].getAttribute("lon") - 0;
-    let ele = trkpts[i].querySelector("ele").textContent - 0;
+    let ele = null;
     let XYZ = latlon2XYZ(lat, lon);
-
+    
+    if(trkpts[i].querySelector("ele")){
+      ele = trkpts[i].querySelector("ele").textContent - 0;
+    }
     if(i >= 1){
       d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lon, lat, lon);
     }
@@ -208,7 +211,9 @@ function convertGPXtoTCX(gpx, speed = 15.0 / 3.6){
     buf.push('          <LatitudeDegrees>' + p.lat.toFixed(8) + '</LatitudeDegrees>');
     buf.push('          <LongitudeDegrees>' + p.lon.toFixed(8) + '</LongitudeDegrees>');
     buf.push('        </Position>');
-    buf.push('        <AltitudeMeters>' + p.ele.toFixed(3) + '</AltitudeMeters>');
+    if(p.ele !== null){
+      buf.push('        <AltitudeMeters>' + p.ele.toFixed(3) + '</AltitudeMeters>');
+    }
     buf.push('        <DistanceMeters>' + p.dist.toFixed(3) + '</DistanceMeters>');
     buf.push('      </Trackpoint>');
   }
