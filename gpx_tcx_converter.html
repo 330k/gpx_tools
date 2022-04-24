@@ -365,15 +365,21 @@ function showLoader(){
 /**
  * iframeで埋め込まれたときに親ウィンドウに自身の高さ情報を渡し、リサイズを要求
  */
-function notifyResize(){
-  const target = parent.postMessage ? parent : (parent.document.postMessage ? parent.document : undefined);
-  if (typeof target !== "undefined") {
-    target.postMessage(JSON.stringify({
-      "message": "resize",
-      "height": document.body.scrollHeight
-    }), "*");
-  }
-}
+(function(){
+  const notifyResize = function (){
+    const target = parent.postMessage ? parent : (parent.document.postMessage ? parent.document : undefined);
+    if (typeof target !== "undefined") {
+      target.postMessage(JSON.stringify({
+        "message": "resize",
+        "height": document.body.scrollHeight
+      }), "*");
+    }
+  };
+  window.addEventListener("load", function(){
+    setTimeout(notifyResize, 50);
+  });
+  window.addEventListener("resize", notifyResize);
+})();
 </script>
 <link rel="stylesheet" href="https://unpkg.com/purecss@2.1.0/build/pure-min.css" integrity="sha384-yHIFVG6ClnONEA5yB5DJXfW2/KC173DIQrYoZMEtBvGzmf0PKiGyNEqe9N6BNDBH" crossorigin="anonymous">
 <style>
