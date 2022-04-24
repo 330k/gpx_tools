@@ -222,7 +222,7 @@ async function processGPX(){
       deleteElements(xmldocs, "trkpt > time, rtept > time, wpt > time", "");
     }
     if(document.getElementById("delete_others").checked === true){
-      deleteElements(xmldocs, "trkpt > *, rtept > *, wpt > *", "ele, time");
+      deleteElements(xmldocs, "trkpt > *", "ele, time");
     }
     
     if(document.getElementById("delete_whitespaces").checked === true){
@@ -239,7 +239,6 @@ async function processGPX(){
     }else{
       downloadnames = filenames;
     }
-console.log(downloadnames);
 
     createGPXDownloadLink(xmldocs, downloadnames);
     
