@@ -11,38 +11,48 @@
 <!--<meta name="viewport" content="width=640">-->
 <script>
 /**
- * Hubeny測地線距離計算式
+ * Andoyer-Lambert-Thomas測地線距離計算式
  * @param {number} lat1
  * @param {number} lon1
  * @param {number} lat2
  * @param {number} lon2
  * @return {number} distance [m]
  */
-const hubeny = (function(){
+function andoyerlambertthomas(lat1, lon1, lat2, lon2){
   const a = 6378137.0;
-  const f = 1 / 298.257223563;
-  const e2 = f * (2 - f);
+  const F = 1 / 298.257223563;
   const degree = Math.PI / 180.0;
-  const sin = Math.sin;
-  const cos = Math.cos;
-  const sqrt = Math.sqrt;
-  return function (lat1, lon1, lat2, lon2){
-    const latdiff = (lat1 - lat2) * degree;
-    const londiff = (lon1 - lon2) * degree;
-    const latave = 0.5 * (lat1 + lat2) * degree;
-    const sinlatave = sin(latave);
-    const coslatave = cos(latave);
-    const w2 = 1.0 - sinlatave * sinlatave * e2;
-    const w = sqrt(w2);
-    const meridian = a * (1 - e2) / (w2 * w);
-    const n = a / w;
+  const rlat1 = lat1 * degree;
+  const rlon1 = lon1 * degree;
+  const rlat2 = lat2 * degree;
+  const rlon2 = lon2 * degree;
+  
+  const b = (1 - F);
+  const f = 0.5 * (rlat2 + rlat1);
+  const g = 0.5 * (rlat2 - rlat1);
+  const l = 0.5 * (rlon2 - rlon1);
+  
+  const sf = Math.sin(f), sg = Math.sin(g), sl = Math.sin(l);
+  const s2f = sf * sf, s2g = sg * sg, s2l = sl * sl;
+  const c2f = 1 - s2f, c2g = 1 - s2g, c2l = 1 - s2l;
+  
+  const s2 = s2g * c2l + c2f * s2l;
+  const c2 = c2g * c2l + s2f * s2l;
+  
+  const s = Math.sqrt(s2), c = Math.sqrt(c2);
+  const omega = Math.atan2(s, c);
+  const rr = s * c;
+  const aa = s2g * c2f / s2 + s2f * c2g / c2;
+  const bb = s2g * c2f / s2 - s2f * c2g / c2;
+  const pp = rr / omega;
+  const qq = omega / rr;
+  const d2 = s2 - c2;
+  const qp = qq + 6*pp;
+  const eps1 = 0.5 * F * (-aa - 3 * bb * pp);
+  const eps2 = 0.25 * F * F * ((-qp * bb + (-3.75 + d2 * (qq + 3.75 * pp)) * aa + 4 - d2 * qq) * aa - (7.5 * d2 * bb * pp - qp) * bb);
 
-    return sqrt(
-      latdiff * latdiff * meridian * meridian +
-      londiff * londiff * n * n * coslatave * coslatave
-    );
-  };
-})();
+  return 2*omega*a*(1 + eps1 + eps2);
+}
 
 /**
  * 緯度経度から地心直交座標系(X, Y, Z)に変換
@@ -227,7 +237,7 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
   // 間引き後に距離を計算
   let d = 0.0;
   for(let i = 1; i < coords.length; i++){
-    d += hubeny(coords[i - 1].lat, coords[i - 1].lon, coords[i].lat, coords[i].lon);
+    d += andoyerlambertthomas(coords[i - 1].lat, coords[i - 1].lon, coords[i].lat, coords[i].lon);
     
     coords[i].dist = d;
     coords[i].time = d / speed * 1000;
