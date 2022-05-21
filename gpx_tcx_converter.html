@@ -232,10 +232,10 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
 
   // trkpt要素を走査
   for(let i = 0; i < trkpts.length; i++){
-    let lat = trkpts[i].getAttribute("lat") - 0;
-    let lon = trkpts[i].getAttribute("lon") - 0;
+    const lat = trkpts[i].getAttribute("lat") - 0;
+    const lon = trkpts[i].getAttribute("lon") - 0;
     let ele = null;
-    let XYZ = latlon2XYZ(lat, lon); // ele = 0のときの地心直交座標系座標
+    const XYZ = latlon2XYZ(lat, lon); // ele = 0のときの地心直交座標系座標
     let XYZ2 = null; // eleを考慮した地心直交座標系座標
     
     if(trkpts[i].querySelector("ele")){
@@ -288,12 +288,12 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
   }];
   
   for(let i = 0; i < wpts.length; i++){
-    let lat = wpts[i].getAttribute("lat") - 0;
-    let lon = wpts[i].getAttribute("lon") - 0;
-    let XYZ = latlon2XYZ(lat, lon);
+    const lat = wpts[i].getAttribute("lat") - 0;
+    const lon = wpts[i].getAttribute("lon") - 0;
+    const XYZ = latlon2XYZ(lat, lon);
     
     // コースポイントの距離を判定
-    let nearest = {
+    const nearest = {
       index: -1,
       t: 0,
       dist_dev: Number.MAX_VALUE
@@ -307,9 +307,9 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
         nearest.dist_dev = v.dist;
       }
     }
-    let name = wpts[i].querySelector("name").textContent;
-    let dist = (1 - nearest.t) * coords[nearest.index].dist + nearest.t * coords[nearest.index + 1].dist;
-    let time = dist / speed * 1000;
+    const name = wpts[i].querySelector("name").textContent;
+    const dist = (1 - nearest.t) * coords[nearest.index].dist + nearest.t * coords[nearest.index + 1].dist;
+    const time = dist / speed * 1000;
     
     if(name.match(/\|\|$/)){
       // 特定のパターンのnameを持つのwpt要素はルート分割点とする
@@ -361,14 +361,14 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
   const result = [];
   
   for(let i = 0; i < dividepoints.length - 1; i++){
-    let cs = [...coords.slice(dividepoints[i].index + 1, dividepoints[i + 1].index + 1)];
-    let ps = [...coursepoints.filter((e) => ((dividepoints[i].dist < e.dist) && (e.dist <= dividepoints[i + 1].dist)))];
+    const cs = [...coords.slice(dividepoints[i].index + 1, dividepoints[i + 1].index + 1)];
+    const ps = [...coursepoints.filter((e) => ((dividepoints[i].dist < e.dist) && (e.dist <= dividepoints[i + 1].dist)))];
     
     if(dividepoints[i].t !== 1){
       // 始点でt != 1のときは分割点をコースの先頭に加える(内分点はXYZ座標で計算)
-      let t = dividepoints[i].t;
-      let index = dividepoints[i].index;
-      let latlon = xyz2LatLon(
+      const t = dividepoints[i].t;
+      const index = dividepoints[i].index;
+      const latlon = xyz2LatLon(
         (1 - t) * coords[index].X + t * coords[index + 1].X,
         (1 - t) * coords[index].Y + t * coords[index + 1].Y,
         (1 - t) * coords[index].Z + t * coords[index + 1].Z
@@ -383,9 +383,9 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
     }
     if(dividepoints[i + 1].t !== 0){
       // 終点でt != 0のときは分割点をコースの末尾に加える(内分点はXYZ座標で計算)
-      let t = dividepoints[i + 1].t;
-      let index = dividepoints[i + 1].index;
-      let latlon = xyz2LatLon(
+      const t = dividepoints[i + 1].t;
+      const index = dividepoints[i + 1].index;
+      const latlon = xyz2LatLon(
         (1 - t) * coords[index].X + t * coords[index + 1].X,
         (1 - t) * coords[index].Y + t * coords[index + 1].Y,
         (1 - t) * coords[index].Z + t * coords[index + 1].Z
@@ -400,8 +400,8 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
     }
     
     // 時刻と距離を修正
-    let dist_base = cs[0].dist;
-    let time_base = cs[0].time;
+    const dist_base = cs[0].dist;
+    const time_base = cs[0].time;
     for(const c of cs){
       c.dist = c.dist - dist_base;
       c.time = c.time - time_base + date_start;
@@ -501,7 +501,7 @@ function reducePoints(coords, threshold = 1){
     const b = coords[end];
     
     for(let i = start + 1; i < end; i++){
-      let dist = segmentPointDistance3D(a.X2, a.Y2, a.Z2, b.X2, b.Y2, b.Z2, coords[i].X2, coords[i].Y2, coords[i].Z2).dist;
+      const dist = segmentPointDistance3D(a.X2, a.Y2, a.Z2, b.X2, b.Y2, b.Z2, coords[i].X2, coords[i].Y2, coords[i].Z2).dist;
       
       if(dist > farthest_dist){
         farthest_index = i;
@@ -534,7 +534,7 @@ function downloadTCX(content, filename){
     blob = new Blob([content], {type:"application/xml"});
     
   }catch(err){
-    let bb = new BlobBuilder();
+    const bb = new BlobBuilder();
     bb.append(content);
     blob = bb.getBlob("application/xml");
     
