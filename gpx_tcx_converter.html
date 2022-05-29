@@ -236,11 +236,11 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
     const lon = trkpts[i].getAttribute("lon") - 0;
     let ele = null;
     const XYZ = latlon2XYZ(lat, lon); // ele = 0のときの地心直交座標系座標
-    let XYZ2 = null; // eleを考慮した地心直交座標系座標
+    let XYZ2 = null; // eleを考慮した地心直交座標系座標(Douglas-Peuckerで使用。eleは10倍にして計算)
     
     if(trkpts[i].querySelector("ele")){
       ele = trkpts[i].querySelector("ele").textContent - 0;
-      XYZ2 = latlon2XYZ(lat, lon, ele);
+      XYZ2 = latlon2XYZ(lat, lon, ele * 10);
     }else{
       XYZ2 = XYZ;
     }
