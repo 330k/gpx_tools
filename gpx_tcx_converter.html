@@ -253,48 +253,32 @@ class FITExporter {
     
     for(let i = 0; i < this.coursepoints.length; i++){
       const encoded = encoder.encode(this.coursepoints[i].name).slice(0, 254);
+      const time = this._dateToTimestamp(this.coursepoints[i].time);
+      const lat = this._latlonToSemicircle(this.coursepoints[i].lat);
+      const lon = this._latlonToSemicircle(this.coursepoints[i].lon);
+      const dist = Math.round(this.coursepoints[i].dist * 100);
       
       // Data Definition
-      data.push(0x45);
-      data.push(0x00); // Reserved
-      data.push(0x01); // BigEndian
-      data.push(0x00); // Global Message Number: 32 (course_point)
-      data.push(0x20);
-      data.push(0x05); // # of Fields
-      data.push(0x01); // 0x01: timestamp
-      data.push(0x04);
-      data.push(0x86);
-      data.push(0x02); // 0x02: position_lat
-      data.push(0x04);
-      data.push(0x85);
-      data.push(0x03); // 0x03: position_long
-      data.push(0x04);
-      data.push(0x85);
-      data.push(0x04); // 0x04: distance
-      data.push(0x04);
-      data.push(0x86);
-      data.push(0x06); // 0x06: name
-      data.push(encoded.length + 1);
-      data.push(0x07);
-      
-      // Data Message
-      data.push(0x05);
-      let time = this._dateToTimestamp(this.coursepoints[i].time);
-      data.push(...(this._toUINT32(time)));
-      
-      let lat = this._latlonToSemicircle(this.coursepoints[i].lat);
-      data.push(...(this._toSINT32(lat)));
-      
-      let lon = this._latlonToSemicircle(this.coursepoints[i].lon);
-      data.push(...(this._toSINT32(lon)));
-      
-      let dist = Math.round(this.coursepoints[i].dist * 100);
-      data.push(...(this._toUINT32(dist)));
-      
-      for(let j = 0; j < encoded.length; j++){
-        data.push(encoded[j]);
-      }
-      data.push(0x00);
+      data.push(...[
+        0x45,
+        0x00,             // Reserved
+        0x01,             // BigEndian
+        0x00, 0x20,       // Global Message Number: 32 (course_point)
+        0x05,             // # of Fields
+        0x01, 0x04, 0x86, // 0x01: timestamp
+        0x02, 0x04, 0x85, // 0x02: position_lat
+        0x03, 0x04, 0x85, // 0x03: position_long
+        0x04, 0x04, 0x86, // 0x04: distance
+        0x06, encoded.length + 1, 0x07, // 0x06: name
+        
+        // Data Message
+        0x05,
+        ...(this._toUINT32(time)),
+        ...(this._toSINT32(lat)),
+        ...(this._toSINT32(lon)),
+        ...(this._toUINT32(dist)),
+        ...encoded, 0x00
+      ]);
     }
     
     return data;
