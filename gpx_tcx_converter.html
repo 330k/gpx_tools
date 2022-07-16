@@ -4,12 +4,15 @@
 <meta charset="utf-8">
 <title>GPX to FIT/TCX Converter</title>
 <meta property="og:title" content="GPX to FIT/TCX Converter" />
-<meta property="og:description" content="GPXからFIT/TCXファイルに変換するツールです。wpt要素をコースポイントに変換します。" />
+<meta property="og:description" content="GPXからFIT/TCXファイルに変換するツールです。GPX中のwpt要素をコースポイントに変換します。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.330k.info/" />
 <meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
 <!--<meta name="viewport" content="width=640">-->
 <script>
+/**
+ * FITファイル生成クラス
+ */
 class FITExporter {
   constructor(name, coords, coursepoints){
     this.course_name = name;
@@ -17,6 +20,10 @@ class FITExporter {
     this.coursepoints = coursepoints;
   }
   
+  /**
+   * FITファイルをエクスポート
+   * @return {Uint8Array}
+   */
   export(){
     const data_records = [
       ...(this._createFileId()),
@@ -392,6 +399,94 @@ class FITExporter {
 }
 
 /**
+ * TCXファイル生成クラス
+ */
+class TCXExporter {
+  constructor(name, coords, coursepoints){
+    this.course_name = name;
+    this.coords = coords;
+    this.coursepoints = coursepoints;
+  }
+  
+  /**
+   * TCX文字列を出力
+   * @return {string}
+   */
+  export(){
+    const buf = [];
+    
+    buf.push('<?xml version="1.0" encoding="UTF-8"?>');
+    buf.push('<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www8.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd">');
+    buf.push('<Folders><Courses><CourseFolder Name="330k.info"><CourseNameRef><Id>' + name + '</Id></CourseNameRef></CourseFolder></Courses></Folders>');
+    buf.push('<Courses>');
+    buf.push('  <Course>');
+    buf.push('    <Name>' + this.course_name + '</Name>');
+    buf.push('    <Lap>');
+    buf.push('      <TotalTimeSeconds>' + ((this.coords[this.coords.length - 1].time - this.coords[0].time) / 1000).toFixed(1) + '</TotalTimeSeconds>');
+    buf.push('      <DistanceMeters>' + this.coords[this.coords.length - 1].dist.toFixed(2) + '</DistanceMeters>');
+    buf.push('      <BeginPosition>');
+    buf.push('        <LatitudeDegrees>' + this.coords[0].lat.toFixed(7) + '</LatitudeDegrees>');
+    buf.push('        <LongitudeDegrees>' + this.coords[0].lon.toFixed(7) + '</LongitudeDegrees>');
+    buf.push('      </BeginPosition>');
+    buf.push('      <EndPosition>');
+    buf.push('        <LatitudeDegrees>' + this.coords[this.coords.length - 1].lat.toFixed(7) + '</LatitudeDegrees>');
+    buf.push('        <LongitudeDegrees>' + this.coords[this.coords.length - 1].lon.toFixed(7) + '</LongitudeDegrees>');
+    buf.push('      </EndPosition>');
+    buf.push('      <Intensity>Active</Intensity>');
+    buf.push('    </Lap>');
+    
+    buf.push('    <Track>');
+    for(const p of this.coords){
+      buf.push('      <Trackpoint>');
+      buf.push('        <Time>' + this._toTCXISOString(new Date(p.time)) + '</Time>');
+      buf.push('        <Position>');
+      buf.push('          <LatitudeDegrees>' + p.lat.toFixed(7) + '</LatitudeDegrees>');
+      buf.push('          <LongitudeDegrees>' + p.lon.toFixed(7) + '</LongitudeDegrees>');
+      buf.push('        </Position>');
+      if(p.ele !== null){
+        buf.push('        <AltitudeMeters>' + p.ele.toFixed(1) + '</AltitudeMeters>');
+      }
+      buf.push('        <DistanceMeters>' + p.dist.toFixed(2) + '</DistanceMeters>');
+      buf.push('      </Trackpoint>');
+    }
+    buf.push('    </Track>');
+    
+    for(const p of this.coursepoints){
+      buf.push('    <CoursePoint>');
+      buf.push('      <Name>' + p.name + '</Name>');
+      buf.push('      <Time>' + this._toTCXISOString(new Date(p.time)) + '</Time>');
+      buf.push('      <Position>');
+      buf.push('        <LatitudeDegrees>' + p.lat.toFixed(7) + '</LatitudeDegrees>');
+      buf.push('        <LongitudeDegrees>' + p.lon.toFixed(7) + '</LongitudeDegrees>');
+      buf.push('      </Position>');
+      buf.push('      <PointType>Generic</PointType>');
+      buf.push('    </CoursePoint>');
+    }
+    
+    buf.push('  </Course>');
+    buf.push('</Courses>');
+    buf.push('</TrainingCenterDatabase>');
+
+    
+    return buf.join("\n");
+  }
+  
+  /**
+   * DateをTCXファイル用のISO-8869形式の文字列に変換(秒は整数表記)
+   * @param {Date} d
+   */
+  _toTCXISOString(d){
+    const d2 = new Date(d);
+    if(d2.getMilliseconds() >= 500){
+      d2.setSeconds(d2.getSeconds() + 1);
+    }
+    d2.setMilliseconds(0);
+    
+    return d2.toISOString().replace(/\.\d\d\dZ/, 'Z');
+  }
+}
+
+/**
  * Hubeny測地線距離計算式(標準)
  * https://amano-tec.com/apps/paceruler.html
  * @param {number} lat1
@@ -557,20 +652,6 @@ function segmentPointDistance3D(ax, ay, az, bx, by, bz, px, py, pz){
     "z": z,
     "t": t
   };
-}
-
-/**
- * DateをTCXファイル用のISO-8869形式の文字列に変換(秒は整数表記)
- * @param {Date} d
- */
-function toTCXISOString(d){
-  const d2 = new Date(d);
-  if(d2.getMilliseconds() >= 500){
-    d2.setSeconds(d2.getSeconds() + 1);
-  }
-  d2.setMilliseconds(0);
-  
-  return d2.toISOString().replace(/\.\d\d\dZ/, 'Z');
 }
 
 /**
@@ -800,71 +881,7 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
   }
   console.log(result);
   
-  return result;
-}
-
-/**
- * TCX文字列を出力
- * @param {{name:string,coords:Array,coursepoints:Array}} course
- * @return {string}
- */
-function exportTCX(course){
-  const buf = [];
-  
-  buf.push('<?xml version="1.0" encoding="UTF-8"?>');
-  buf.push('<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www8.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd">');
-  buf.push('<Folders><Courses><CourseFolder Name="330k.info"><CourseNameRef><Id>' + name + '</Id></CourseNameRef></CourseFolder></Courses></Folders>');
-  buf.push('<Courses>');
-  buf.push('  <Course>');
-  buf.push('    <Name>' + course.name + '</Name>');
-  buf.push('    <Lap>');
-  buf.push('      <TotalTimeSeconds>' + ((course.coords[course.coords.length - 1].time - course.coords[0].time) / 1000).toFixed(1) + '</TotalTimeSeconds>');
-  buf.push('      <DistanceMeters>' + course.coords[course.coords.length - 1].dist.toFixed(2) + '</DistanceMeters>');
-  buf.push('      <BeginPosition>');
-  buf.push('        <LatitudeDegrees>' + course.coords[0].lat.toFixed(7) + '</LatitudeDegrees>');
-  buf.push('        <LongitudeDegrees>' + course.coords[0].lon.toFixed(7) + '</LongitudeDegrees>');
-  buf.push('      </BeginPosition>');
-  buf.push('      <EndPosition>');
-  buf.push('        <LatitudeDegrees>' + course.coords[course.coords.length - 1].lat.toFixed(7) + '</LatitudeDegrees>');
-  buf.push('        <LongitudeDegrees>' + course.coords[course.coords.length - 1].lon.toFixed(7) + '</LongitudeDegrees>');
-  buf.push('      </EndPosition>');
-  buf.push('      <Intensity>Active</Intensity>');
-  buf.push('    </Lap>');
-  
-  buf.push('    <Track>');
-  for(const p of course.coords){
-    buf.push('      <Trackpoint>');
-    buf.push('        <Time>' + toTCXISOString(new Date(p.time)) + '</Time>');
-    buf.push('        <Position>');
-    buf.push('          <LatitudeDegrees>' + p.lat.toFixed(7) + '</LatitudeDegrees>');
-    buf.push('          <LongitudeDegrees>' + p.lon.toFixed(7) + '</LongitudeDegrees>');
-    buf.push('        </Position>');
-    if(p.ele !== null){
-      buf.push('        <AltitudeMeters>' + p.ele.toFixed(1) + '</AltitudeMeters>');
-    }
-    buf.push('        <DistanceMeters>' + p.dist.toFixed(2) + '</DistanceMeters>');
-    buf.push('      </Trackpoint>');
-  }
-  buf.push('    </Track>');
-  
-  for(const p of course.coursepoints){
-    buf.push('    <CoursePoint>');
-    buf.push('      <Name>' + p.name + '</Name>');
-    buf.push('      <Time>' + toTCXISOString(new Date(p.time)) + '</Time>');
-    buf.push('      <Position>');
-    buf.push('        <LatitudeDegrees>' + p.lat.toFixed(7) + '</LatitudeDegrees>');
-    buf.push('        <LongitudeDegrees>' + p.lon.toFixed(7) + '</LongitudeDegrees>');
-    buf.push('      </Position>');
-    buf.push('      <PointType>Generic</PointType>');
-    buf.push('    </CoursePoint>');
-  }
-  
-  buf.push('  </Course>');
-  buf.push('</Courses>');
-  buf.push('</TrainingCenterDatabase>');
-
-  
-  return buf.join("\n");
+  return result.filter((e) => e.coords.length >= 2);
 }
 
 /**
@@ -903,11 +920,12 @@ function reducePoints(coords, threshold = 1){
 }
 
 /**
- * TCXファイルをダウンロードさせる
- * @param {string} content  ファイル内容
+ * ファイルをダウンロードさせる
+ * @param {string|TypedArray} content ファイル内容
  * @param {string} filename ダウンロードファイル名
+ * @param {string} mimetype MIME-Type
  */
-function downloadTCX(content, filename, mimetype){
+function downloadAsFile(content, filename, mimetype){
   const e = document.createElement("a");
   let blob;
   
@@ -944,10 +962,10 @@ window.addEventListener("DOMContentLoaded", function(){
         for(const course of courses){
           if(output_format === "FIT"){
             const fit = new FITExporter(course.name, course.coords, course.coursepoints);
-            downloadTCX(fit.export(), course.name + ".fit", "application/octet-stream");
+            downloadAsFile(fit.export(), course.name + ".fit", "application/octet-stream");
           }else if(output_format === "TCX"){
-            const tcx = exportTCX(course);
-            downloadTCX(tcx, course.name + ".tcx", "application/xml");
+            const tcx = new TCXExporter(course.name, course.coords, course.coursepoints);
+            downloadAsFile(tcx.export(), course.name + ".tcx", "application/xml");
           }
         }
       }
