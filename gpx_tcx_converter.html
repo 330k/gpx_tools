@@ -2,14 +2,395 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>GPX to TCX Converter</title>
-<meta property="og:title" content="GPX to TCX Converter" />
-<meta property="og:description" content="GPXからTCXファイルに変換するツールです。wpt要素をCoursePoint要素に変換します。" />
+<title>GPX to FIT/TCX Converter</title>
+<meta property="og:title" content="GPX to FIT/TCX Converter" />
+<meta property="og:description" content="GPXからFIT/TCXファイルに変換するツールです。wpt要素をコースポイントに変換します。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.330k.info/" />
 <meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
 <!--<meta name="viewport" content="width=640">-->
 <script>
+class FITExporter {
+  constructor(name, coords, coursepoints){
+    this.course_name = name;
+    this.coords = coords;
+    this.coursepoints = coursepoints;
+  }
+  
+  export(){
+    const data_records = [
+      ...(this._createFileId()),
+      ...(this._createCourse()),
+      ...(this._createLap()),
+      ...(this._createEventTimerStart()),
+      ...(this._createRecord()),
+      ...(this._createCoursePoint()),
+      ...(this._createEventTimerStop())
+    ];
+    
+    const header = this._createHeader(data_records.length);
+    const crc = this._crc(data_records);
+    
+    return new Uint8Array([
+      ...header,
+      ...data_records,
+      crc & 0xFF, (crc >> 8) & 0xFF
+    ]);
+  }
+  
+  /**
+   * FITファイルヘッダを生成する
+   * @param {number} data_size ヘッダを含まないバイト数
+   * @return {Uint8Array}
+   */
+  _createHeader(data_size){
+    const data = [
+      14,                     // Header Size = 14
+      0x10,                   // Protocol Version = 16
+      0x84, 0x08,             // Profile Version = 2180(0x0884)
+      data_size & 0xFF,
+      (data_size >> 8) & 0xFF,
+      (data_size >> 16) & 0xFF,
+      (data_size >> 24) & 0xFF,
+      0x2e, 0x46, 0x49, 0x54, // Data Type = ".FIT"
+      0x00, 0x00              // CRC(dummy)
+    ];
+    
+    const crc = this._crc(data.slice(0, 12));
+    data[12] = crc & 0xFF; // CRC
+    data[13] = (crc >> 8) & 0xFF;
+    
+    return data;
+  }
+  
+  _createFileId(){
+    const time = this._dateToTimestamp(this.coords[0].time);
+    
+    const data = [
+      // Data Definition
+      0x40,
+      0x00,             // Reserved
+      0x01,             // BigEndian
+      0x00, 0x00,       // Global Message Number: 0 (fild_id)
+      0x05,             // # of Fields
+      0x00, 0x01, 0x00, // 0x00: file_id
+      0x01, 0x02, 0x84, // 0x01: manufacturer
+      0x02, 0x02, 0x84, // 0x02: product
+      0x04, 0x04, 0x86, // 0x04: time_create
+      0x03, 0x04, 0x8c, // 0x03: serial_number
+      
+      // Data Message
+      0x00,
+      0x06,             // Field #1: Type = 6(course)
+      0x00, 0xff,       // Field #2: manufacturer = 0xff(development)
+      0x03, 0x30,       // Field #3: product = 0x0330
+      //0x00, 0x01,       // Field #2: manufacturer = 0xff(development)
+      //0x00, 0xfe,       // Field #3: product = 0x0330
+      // Field #4: time_create
+      ...(this._toUINT32(time)),
+      // Field #5: serial_number
+      ...(this._toUINT32(Math.floor(Math.random() * (2 ** 32))))
+      //0x00, 0x00, 0x00, 0x00
+    ];
+    
+    return data;
+  }
+  
+  _createCourse(){
+    const encoder = new TextEncoder();
+    const encoded = encoder.encode(this.course_name).slice(0, 254);
+    
+    const data = [
+      // Data Definition
+      0x41,
+      0x00,             // Reserved
+      0x01,             // BigEndian
+      0x00, 0x1f,       // Global Message Number: 31 (course)
+      0x02,             // # of Fields
+      0x05, encoded.length + 1, 0x07, // 0x05: name コース名のバイト数+1
+      0x04, 0x01, 0x00  // 0x04: sport
+    ];
+    
+    // Data Message
+    data.push(0x01);
+    // Field #1: Course Name
+    for(let i = 0; i < encoded.length; i++){
+      data.push(encoded[i]);
+    }
+    data.push(0x00); // 最後は\0で終わる
+    
+    data.push(0x02); // Field #2: sport = 2
+    
+    return data;
+  }
+  
+  _createLap(){
+    const time = this._dateToTimestamp(this.coords[0].time);
+    const lat1 = this._latlonToSemicircle(this.coords[0].lat);
+    const lon1 = this._latlonToSemicircle(this.coords[0].lon);
+    const lat2 = this._latlonToSemicircle(this.coords[this.coords.length - 1].lat);
+    const lon2 = this._latlonToSemicircle(this.coords[this.coords.length - 1].lon);
+    const elapsed_time = Math.round((this.coords[this.coords.length - 1].time - this.coords[0].time));
+    const dist = Math.round(this.coords[this.coords.length - 1].dist * 100);
+    
+    const data = [
+      // Data Definition
+      0x42,
+      0x00,             // Reserved
+      0x01,             // BigEndian
+      0x00, 0x13,       // Global Message Number: 19 (lap)
+      0x09,             // # of Fields
+      0x02, 0x04, 0x86, // 0x02: start_time
+      0xfd, 0x04, 0x86, // 0xfd: timestamp
+      0x03, 0x04, 0x85, // 0x03: start_position_lat
+      0x04, 0x04, 0x85, // 0x04: start_position_long
+      0x05, 0x04, 0x85, // 0x05: end_position_lat
+      0x06, 0x04, 0x85, // 0x06: end_position_long
+      0x07, 0x04, 0x86, // 0x07: total_elapsed_time
+      0x08, 0x04, 0x86, // 0x08: total_timer_time
+      0x09, 0x04, 0x86, // 0x09: total_distance
+      
+      // Data Message
+      0x02,
+      // Field #1: start_time
+      ...(this._toUINT32(time)),
+      // Field #2: timestamp
+      ...(this._toUINT32(time)),
+      // Field #3: start_position_lat
+      ...(this._toSINT32(lat1)),
+      // Field #4: start_position_long
+      ...(this._toSINT32(lon1)),
+      // Field #5: end_position_lat
+      ...(this._toSINT32(lat2)),
+      // Field #6: end_position_long
+      ...(this._toSINT32(lon2)),
+      // Field #7: total_elapsed_time
+      ...(this._toUINT32(elapsed_time)),
+      // Field #7: total_timer_time
+      ...(this._toUINT32(elapsed_time)),
+      // Field #9: total_distance
+      ...(this._toUINT32(dist))
+    ];
+    
+    return data;
+  }
+  
+  _createEventTimerStart(){
+    const time = this._dateToTimestamp(this.coords[0].time);
+    
+    const data = [
+      // Data Definition
+      0x43,
+      0x00,             // Reserved
+      0x01,             // BigEndian
+      0x00, 0x15,       // Global Message Number: 21 (event)
+      0x04,             // # of Fields
+      0xfd, 0x04, 0x86, // 0x00: timestamp
+      0x00, 0x01, 0x00, // 0x00: event
+      0x01, 0x01, 0x00, // 0x01: event_type
+      0x04, 0x01, 0x02, // 0x01: event_group
+      
+      // Data Message
+      0x03,
+      // Field #1: timestamp
+      ...(this._toUINT32(time)),
+      
+      0,                // Field #2: event = 0
+      0,                // Field #3: event_type = 0 (start)
+      0                 // Field #4: event_group = 0 (start)
+    ];
+    
+    return data;
+  }
+  
+  _createRecord(){
+    const data = [
+      // Data Definition
+      0x44,
+      0x00,             // Reserved
+      0x01,             // BigEndian
+      0x00, 0x14,       // Global Message Number: 20 (record)
+      0x05,             // # of Fields
+      0xfd, 0x04, 0x86, // 0xfd: timestamp
+      0x00, 0x04, 0x85, // 0x00: position_lat
+      0x01, 0x04, 0x85, // 0x01: position_long
+      0x02, 0x02, 0x84, // 0x02: altitude
+      0x05, 0x04, 0x86  // 0x05: distance
+    ];
+    // Data Message
+    for(let i = 0; i < this.coords.length; i++){
+      data.push(0x04);
+      let time = this._dateToTimestamp(this.coords[i].time);
+      data.push(...(this._toUINT32(time)));
+      
+      let lat = this._latlonToSemicircle(this.coords[i].lat);
+      data.push(...(this._toSINT32(lat)));
+      
+      let lon = this._latlonToSemicircle(this.coords[i].lon);
+      data.push(...(this._toSINT32(lon)));
+      
+      let alt = Math.round((this.coords[i].ele + 500) * 5);
+      data.push(...(this._toUINT16(alt)));
+      
+      let dist = Math.round(this.coords[i].dist * 100);
+      data.push(...(this._toUINT32(dist)));
+    }
+    
+    return data;
+  }
+  
+  
+  _createCoursePoint(){
+    const data = []
+    const encoder = new TextEncoder();
+    
+    for(let i = 0; i < this.coursepoints.length; i++){
+      const encoded = encoder.encode(this.coursepoints[i].name).slice(0, 254);
+      
+      // Data Definition
+      data.push(0x45);
+      data.push(0x00); // Reserved
+      data.push(0x01); // BigEndian
+      data.push(0x00); // Global Message Number: 32 (course_point)
+      data.push(0x20);
+      data.push(0x05); // # of Fields
+      data.push(0x01); // 0x01: timestamp
+      data.push(0x04);
+      data.push(0x86);
+      data.push(0x02); // 0x02: position_lat
+      data.push(0x04);
+      data.push(0x85);
+      data.push(0x03); // 0x03: position_long
+      data.push(0x04);
+      data.push(0x85);
+      data.push(0x04); // 0x04: distance
+      data.push(0x04);
+      data.push(0x86);
+      data.push(0x06); // 0x06: name
+      data.push(encoded.length + 1);
+      data.push(0x07);
+      
+      // Data Message
+      data.push(0x05);
+      let time = this._dateToTimestamp(this.coursepoints[i].time);
+      data.push(...(this._toUINT32(time)));
+      
+      let lat = this._latlonToSemicircle(this.coursepoints[i].lat);
+      data.push(...(this._toSINT32(lat)));
+      
+      let lon = this._latlonToSemicircle(this.coursepoints[i].lon);
+      data.push(...(this._toSINT32(lon)));
+      
+      let dist = Math.round(this.coursepoints[i].dist * 100);
+      data.push(...(this._toUINT32(dist)));
+      
+      for(let j = 0; j < encoded.length; j++){
+        data.push(encoded[j]);
+      }
+      data.push(0x00);
+    }
+    
+    return data;
+  }
+  
+  _createEventTimerStop(){
+    const time = this._dateToTimestamp(this.coords[this.coords.length - 1].time);
+    
+    const data = [
+      // Data Definition
+      0x43,
+      0x00,             // Reserved
+      0x01,             // BigEndian
+      0x00, 0x15,       // Global Message Number: 21 (event)
+      0x04,             // # of Fields
+      0xfd, 0x04, 0x86, // 0x00: timestamp
+      0x00, 0x01, 0x00, // 0x00: event
+      0x01, 0x01, 0x00, // 0x01: event_type
+      0x04, 0x01, 0x02, // 0x01: event_group
+      
+      // Data Message
+      0x03,
+      // Field #1: timestamp
+      ...(this._toUINT32(time)),
+      
+      0,                // Field #2: event = 0
+      9,                // Field #3: event_type = 9 (disable_stop_all)
+      0                 // Field #4: event_group = 0
+    ];
+    
+    return data;
+  }
+  
+  /**
+   * Garmin CRC計算関数
+   * @param {Uint8Array} bytes
+   */
+  _crc(bytes){
+    const crc_table = [
+      0x0000, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401,
+      0xA001, 0x6C00, 0x7800, 0xB401, 0x5000, 0x9C01, 0x8801, 0x4400
+    ];
+    let tmp;
+    let crc = 0x00;
+    for(let i = 0; i < bytes.length; i++){
+      tmp = crc_table[crc & 0x0F];
+      crc = (crc >> 4) & 0x0FFF;
+      crc = crc ^ tmp ^ crc_table[bytes[i] & 0x0F];
+      
+      tmp = crc_table[crc & 0x0F];
+      crc = (crc >> 4) & 0x0FFF;
+      crc = crc ^ tmp ^ crc_table[(bytes[i] >> 4) & 0x0F];
+    }
+    
+    return crc;
+  }
+  
+  /**
+   * Garmin timestamp形式に変換
+   * @param {number} date 1970/01/01からの経過ミリ秒
+   * @return {number} 1989/12/31 00:00:00 UTFからの経過秒
+   */
+  _dateToTimestamp(date){
+    return (date - Date.UTC(1989, 11, 31)) / 1000;
+  }
+  
+  /**
+   * 緯度経度(度数)からsemicircle形式に変換
+   * @param {number} deg 度数
+   * @return {number} -2**31 - 2**31までの整数
+   */
+  _latlonToSemicircle(deg){
+    return Math.round(deg / 180 * (2**31));
+  }
+  
+  /**
+   *
+   * @return {[byte]}
+   */
+  _toUINT32(val){
+    return [
+      (val >> 24) & 0xFF,
+      (val >> 16) & 0xFF,
+      (val >> 8) & 0xFF,
+      val & 0xFF
+    ];
+  }
+  _toSINT32(val){
+    return [
+      (val >> 24) & 0x7F + ((val < 0) ? 128 : 0),
+      (val >> 16) & 0xFF,
+      (val >> 8) & 0xFF,
+      val & 0xFF
+    ];
+  }
+  _toUINT16(val){
+    return [
+      (val >> 8) & 0xFF,
+      val & 0xFF
+    ];
+  }
+}
+
 /**
  * Hubeny測地線距離計算式(標準)
  * https://amano-tec.com/apps/paceruler.html
@@ -262,7 +643,7 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
   if(dp_threshold > 0){
     // Ramer-Douglas-Peuckerで間引き
     console.log("Original Points: " + coords.length);
-    coords = reducePoints(coords);
+    coords = reducePoints(coords, dp_threshold);
     console.log("Reduced Points: " + coords.length);
   }
   
@@ -331,6 +712,7 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
         index: nearest.index,
         t: nearest.t
       });
+      console.log("divide at:");
       console.log(dividepoints[dividepoints.length - 1]);
     }else{
       coursepoints.push({
@@ -340,7 +722,6 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
         dist: dist,
         time: time
       });
-      //console.log(coursepoints[coursepoints.length - 1]);
     }
   }
   dividepoints.push({
@@ -526,17 +907,17 @@ function reducePoints(coords, threshold = 1){
  * @param {string} content  ファイル内容
  * @param {string} filename ダウンロードファイル名
  */
-function downloadTCX(content, filename){
+function downloadTCX(content, filename, mimetype){
   const e = document.createElement("a");
   let blob;
   
   try{
-    blob = new Blob([content], {type:"application/xml"});
+    blob = new Blob([content], {type: mimetype});
     
   }catch(err){
     const bb = new BlobBuilder();
     bb.append(content);
-    blob = bb.getBlob("application/xml");
+    blob = bb.getBlob(mimetype);
     
   }
   e.href = window.URL.createObjectURL(blob);
@@ -553,15 +934,21 @@ window.addEventListener("DOMContentLoaded", function(){
     try{
       showLoader();
       const speed = (document.getElementById("input_speed").value - 0) / 3.6;
-      const dp_threshold = document.getElementById("reduce_points").checked ? 1 : 0;
+      const dp_threshold = document.getElementById("reduce_points").value - 0;
+      const output_format = document.getElementById("output_format").value;
 
       for(const file of evt.target.files){
         const gpx = await readXML(file);
         const courses = parseGPX(gpx, speed, dp_threshold);
         
         for(const course of courses){
-          const tcx = exportTCX(course);
-          downloadTCX(tcx, course.name + ".tcx");
+          if(output_format === "FIT"){
+            const fit = new FITExporter(course.name, course.coords, course.coursepoints);
+            downloadTCX(fit.export(), course.name + ".fit", "application/octet-stream");
+          }else if(output_format === "TCX"){
+            const tcx = exportTCX(course);
+            downloadTCX(tcx, course.name + ".tcx", "application/xml");
+          }
         }
       }
 
@@ -688,15 +1075,27 @@ function showLoader(){
   <input type="file" id="gpx_file" accept=".gpx" multiple>
  </div>
  <div class="pure-control-group">
+  <label for="output_format">出力形式</label>
+  <select id="output_format">
+   <option value="FIT" selected>FIT</option>
+   <option value="TCX">TCX</option>
+  </select>
+ </div>
+ <div class="pure-control-group">
   <label for="input_speed">移動速度</label>
   <input type="number" id="input_speed" value="15" min="1" max="99">
   <span>[km/h]</span>
  </div>
  <div class="pure-control-group">
   <label for="reduce_points">間引く</label>
-  <input type="checkbox" id="reduce_points" checked>
+  <select id="reduce_points">
+   <option value="0">なし</option>
+   <option value="1" selected>弱(閾値: 1m)</option>
+   <option value="3">中(閾値: 3m)</option>
+   <option value="5">強(閾値: 5m)</option>
+  </select>
  </div>
- <p>GPXファイルを選択 or ドロップすると、自動的にTCXファイルに変換します(複数ファイル対応)。<br>変換後は自動的にダウンロードを開始します。</p>
+ <p>GPXファイルを選択 or ドロップすると、自動的にFIT/TCXファイルに変換します(複数ファイル対応)。<br>変換後は自動的にダウンロードを開始します。</p>
 </div>
 <div id="loader_bg">
 <div id="loader">
