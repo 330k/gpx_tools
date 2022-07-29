@@ -6,7 +6,7 @@
 <meta property="og:title" content="GPX to FIT/TCX Converter" />
 <meta property="og:description" content="GPXからFIT/TCXファイルに変換するツールです。GPX中のwpt要素をコースポイントに変換します。" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://www.330k.info/" />
+<meta property="og:url" content="https://www.330k.info/software/gpx-tcx-converter/" />
 <meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
 <!--<meta name="viewport" content="width=640">-->
 <script>
@@ -91,13 +91,10 @@ class FITExporter {
       0x06,             // Field #1: Type = 6(course)
       0x00, 0xff,       // Field #2: manufacturer = 0xff(development)
       0x03, 0x30,       // Field #3: product = 0x0330
-      //0x00, 0x01,       // Field #2: manufacturer = 0xff(development)
-      //0x00, 0xfe,       // Field #3: product = 0x0330
       // Field #4: time_create
       ...(this._toUINT32(time)),
       // Field #5: serial_number
       ...(this._toUINT32(Math.floor(Math.random() * (2 ** 32))))
-      //0x00, 0x00, 0x00, 0x00
     ];
     
     return data;
@@ -355,10 +352,17 @@ class FITExporter {
   }
   
   /**
-   *
+   * FIT_UINT32に変換
+   * @param {number} val
    * @return {[byte]}
    */
   _toUINT32(val){
+    if(val < 0){
+      val = 0;
+    }
+    if(val > 4294967295){
+      val = 4294967295;
+    }
     return [
       (val >> 24) & 0xFF,
       (val >> 16) & 0xFF,
@@ -366,7 +370,19 @@ class FITExporter {
       val & 0xFF
     ];
   }
+  
+  /**
+   * FIT_SINT32に変換
+   * @param {number} val
+   * @return {[byte]}
+   */
   _toSINT32(val){
+    if(val < -2147483648){
+      val = -2147483648;
+    }
+    if(val > 2147483647){
+      val = 2147483647;
+    }
     return [
       (val >> 24) & 0x7F + ((val < 0) ? 128 : 0),
       (val >> 16) & 0xFF,
@@ -374,7 +390,19 @@ class FITExporter {
       val & 0xFF
     ];
   }
+  
+  /**
+   * FIT_UINT16に変換
+   * @param {number} val
+   * @return {[byte]}
+   */
   _toUINT16(val){
+    if(val < 0){
+      val = 0;
+    }
+    if(val > 65535){
+      val = 65535;
+    }
     return [
       (val >> 8) & 0xFF,
       val & 0xFF
@@ -1089,7 +1117,7 @@ function showLoader(){
   <span>[km/h]</span>
  </div>
  <div class="pure-control-group">
-  <label for="reduce_points">間引く</label>
+  <label for="reduce_points">間引き</label>
   <select id="reduce_points">
    <option value="0">なし</option>
    <option value="1" selected>弱(閾値: 1m)</option>

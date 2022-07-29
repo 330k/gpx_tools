@@ -1,0 +1,576 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>GPSルート ヒゲ検出ツール</title>
+<meta property="og:title" content="GPSルート ヒゲ検出ツール" />
+<meta property="og:description" content="GPSルートを作成する時にできてしまう「ヒゲ」を検出するツールです" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://www.330k.info/" />
+<meta property="og:image" content="https://www.330k.info/apple-touch-icon.png"/>
+<!--<meta name="viewport" content="width=640">-->
+<script defer src="https://maps.google.com/maps/api/js?key=AIzaSyA_aFkNjCuqBNETe8bxBk8_cnRQtQzdOG8&amp;callback=initMap"></script>
+<script>
+const googlemap = {
+  map: null,
+  gpxtracks: [],
+};
+const spikes = [];
+
+Promise.all([new Promise(function(resolve, reject){
+  window.initMap_resolve = resolve;
+})]).then(() => {
+  hideLoader();
+});
+
+/**
+ * Google Maps JavaScript API Initialize Callback
+ */
+function initMap(){
+  googlemap.map = new google.maps.Map(document.getElementById('map_canvas'), {
+    zoom: 6,
+    mapTypeId: google.maps.MapTypeId.ROADMAP,
+    center: new google.maps.LatLng(35.681382, 139.766084),
+    fullscreenControl: false,
+    options: {
+      gestureHandling: "greedy"
+    }
+  });
+  googlemap.map.addListener("contextmenu", clearMap);
+  
+  window.initMap_resolve();
+}
+
+/**
+ * Hubeny測地線距離計算式
+ * @param {number} lat1
+ * @param {number} lon1
+ * @param {number} lat2
+ * @param {number} lon2
+ * @return {number} distance [m]
+ */
+ const hubeny = (function(){
+  const a = 6378137.0;
+  const f = 1 / 298.257223563;
+  const e2 = f * (2 - f);
+  const degree = Math.PI / 180.0;
+  const sin = Math.sin;
+  const cos = Math.cos;
+  const sqrt = Math.sqrt;
+  return function (lat1, lon1, lat2, lon2){
+    const latdiff = (lat1 - lat2) * degree;
+    const londiff = (lon1 - lon2) * degree;
+    const latave = 0.5 * (lat1 + lat2) * degree;
+    const sinlatave = sin(latave);
+    const coslatave = cos(latave);
+    const w2 = 1.0 - sinlatave * sinlatave * e2;
+    const w = sqrt(w2);
+    const meridian = a * (1 - e2) / (w2 * w);
+    const n = a / w;
+
+    return sqrt(
+      latdiff * latdiff * meridian * meridian +
+      londiff * londiff * n * n * coslatave * coslatave
+    );
+  };
+})();
+
+/**
+ * XMLファイルを読み込むPromiseを返す
+ * @param {string} file 読み込むファイル
+ * @return {XMLDocument} 読み込んだ結果をXMLObjectを返すPromise
+ */
+function readXML(file){
+  return new Promise(function(resolve, reject){
+    try{
+      const reader = new FileReader();
+      const parser = new DOMParser();
+
+      reader.onload = function(){
+        resolve(parser.parseFromString(reader.result, "text/xml"));
+      };
+      reader.readAsText(file, "utf-8");
+      
+    }catch(e){
+      reject(e);
+    }
+  });
+}
+
+/**
+ * GPXファイルを読み込んで座標データを返す
+ * @param {XMLDocument} gpx GPXファイル
+ * @return {[{lat:number,lng:number,dist:number}]}
+ */
+function parseGPX(gpx){
+  const trkpts = gpx.querySelectorAll("trkpt");
+  if(trkpts.length === 0){
+    return;
+  }
+
+  const coords = [{
+    lat: trkpts[0].getAttribute("lat") - 0,
+    lng: trkpts[0].getAttribute("lon") - 0,
+    dist: 0.0
+  }];
+
+  let d = 0.0;
+  for(let i = 1; i < trkpts.length; i++){
+    let lat = trkpts[i].getAttribute("lat") - 0;
+    let lng = trkpts[i].getAttribute("lon") - 0;
+
+    if((coords[coords.length - 1].lat !== lat) && (coords[coords.length - 1].lng !== lng)){
+      d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
+      coords.push({
+        lat: lat,
+        lng: lng,
+        dist: d
+      });
+    }
+  }
+
+  return coords;
+}
+
+/**
+ * TCXファイルを読み込んで座標データを返す
+ * @param {XMLDocument} gpx GPXファイル
+ * @return {[{lat:number,lng:number,dist:number}]}
+ */
+function parseTCX(tcx){
+  const trkpts = tcx.querySelectorAll("Trackpoint");
+  if(trkpts.length === 0){
+    return;
+  }
+
+  const coords = [{
+    lat: trkpts[0].querySelector("LatitudeDegrees").textContent - 0,
+    lng: trkpts[0].querySelector("LongitudeDegrees").textContent - 0,
+    dist: 0.0
+  }];
+
+  let d = 0.0;
+  for(let i = 1; i < trkpts.length; i++){
+    let lat = trkpts[i].querySelector("LatitudeDegrees").textContent - 0;
+    let lng = trkpts[i].querySelector("LongitudeDegrees").textContent - 0;
+
+    d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
+    coords.push({
+      lat: lat,
+      lng: lng,
+      dist: d
+    });
+  }
+
+  return coords;
+}
+
+/**
+ * ルートをGoogle Mapsに表示
+ * @param {Object} map
+ * @param {XMLDocument} coords
+ * @param {string} color
+ * @return {void}
+ */
+function showGPXRoute(map, coords, color, filename){
+  // 表示用のPolyline
+  const line_display = new google.maps.Polyline({
+    path: coords,
+    geodesic: true,
+    strokeColor: color,
+    strokeOpacity: 1,
+    strokeWeight: 2,
+    zIndex: 10
+  });
+  // マウスイベントを拾うための透明なPolyline
+  const line_transparent = new google.maps.Polyline({
+    path: coords,
+    geodesic: true,
+    strokeColor: color,
+    strokeOpacity: 0,
+    strokeWeight: 30,
+    zIndex: 9999
+  });
+
+  const dist_info = document.getElementById("dist_info");
+
+  line_transparent.addListener("mousemove", function(evt){
+    // GPXトラック上にマウスが来たときは距離を表示する
+    const lat = evt.latLng.lat();
+    const lng = evt.latLng.lng();
+    let dist_min = Number.MAX_VALUE;
+    let index_min = -1;
+
+    for(let i = 0; i < coords.length; i++){
+      let d = hubeny(coords[i].lat, coords[i].lng, lat, lng);
+      if(d < dist_min){
+        index_min = i;
+        dist_min = d;
+      };
+    }
+
+    //console.log(coords[index_min]);
+    //console.log(evt);
+    if(googlemap.dist_marker){
+      googlemap.dist_marker.setPosition(coords[index_min]);
+
+    }else{
+      googlemap.dist_marker = new google.maps.Marker({
+        position: coords[index_min],
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 5,
+            fillColor: color,
+            fillOpacity: 0.5,
+            strokeColor: color,
+            strokeOpacity: 1,
+            strokeWeight: 1
+        },
+        map: googlemap.map
+      });
+    }
+
+    dist_info.innerHTML = filename + ": " + (0.001 * coords[index_min].dist).toFixed(1) + " km";
+    dist_info.style.display = "block";
+    dist_info.style.left = evt.domEvent.pageX - dist_info.clientWidth * 0.5;
+    dist_info.style.top = evt.domEvent.pageY - dist_info.clientHeight - 20;
+
+  });
+  line_transparent.addListener("mouseout", function(evt){
+    dist_info.style.display = "none";
+    if(googlemap.dist_marker){
+      googlemap.dist_marker.setMap(null);
+      googlemap.dist_marker = null;
+    }
+  });
+  googlemap.gpxtracks.push(line_display);
+  line_display.setMap(map);
+  googlemap.gpxtracks.push(line_transparent);
+  line_transparent.setMap(map);
+}
+
+/**
+ * ヒゲを検出する
+ */
+function detectSpike(coords, threshold1 = 10000, threshold2 = 1000){
+  for(let i = 0; i < coords.length; i++){
+    for(let j = i + 1; j < coords.length; j++){
+      if(coords[j].dist - coords[i].dist > threshold1){
+        break;
+      }
+      if((coords[i].lat === coords[j].lat) && (coords[i].lng === coords[j].lng)){
+        // 折り返している部分が見つかった
+          console.log([i, j, coords[j].dist - coords[i].dist]);
+        
+        // 折り返し部分の距離がthreshold2以下ならヒゲとして検出する
+        if(coords[j].dist - coords[i].dist < threshold2){
+          const spike_line = new google.maps.Polyline({
+            path: coords.slice(i, j + 1),
+            geodesic: true,
+            strokeColor: "#f00",
+            strokeOpacity: 1,
+            strokeWeight: 10,
+            zIndex: 100,
+            map: googlemap.map
+          });
+          
+          spikes.push({
+            start: i,
+            end: j,
+            line: spike_line
+          });
+        }
+        i = j;
+        break;
+      }
+    }
+  }
+  
+  console.log(spikes);
+  
+}
+
+window.addEventListener("DOMContentLoaded", function(){
+  // GPX読み込み対応
+  document.getElementById("gpx_file").addEventListener("change", async function(evt){
+    // GPXファイルの読み込み
+    try{
+      showLoader();
+      clearMap();
+
+      const colors = ["#3f3d9a", "#9a3d71", "#9a8c3d", "#3d9a56", "#3d5a9a", "#9a3d90", "#9a6d3d", "#439a3d", "#3d799a", "#843d9a", "#9a4e3d", "#629a3d"];
+      for(let i = 0; i < evt.target.files.length; i++){
+        console.log(evt.target.files[i]);
+        const xml = await readXML(evt.target.files[i]);
+        let coords = null;
+        if(evt.target.files[i].name.match(/\.gpx$/i)){
+          coords = parseGPX(xml);
+        }
+        if(evt.target.files[i].name.match(/\.tcx$/i)){
+          coords = parseTCX(xml);
+        }
+        
+        if(coords){
+          showGPXRoute(googlemap.map, coords, colors[i % colors.length], evt.target.files[i].name);
+          detectSpike(coords);
+        }
+      }
+
+    }catch(err){
+      console.error(err);
+
+    }finally{
+      hideLoader();
+      
+    }
+  });
+
+  // ドラッグドロップ対応
+  {
+    const droparea = document.body;
+    const overlay = document.getElementById("overlay");
+    droparea.addEventListener("dragover", function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      overlay.style.display = "block";
+    }, false);
+    overlay.addEventListener("dragleave", function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      overlay.style.display = "none";
+    }, false);
+    overlay.addEventListener("drop", function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      overlay.style.display = "none";
+      
+      const files = e.dataTransfer.files;
+      document.getElementById("gpx_file").files = files;
+
+      const evt = new Event("change");
+      document.getElementById("gpx_file").dispatchEvent(evt);
+    }, false)
+  };
+});
+
+function clearMap(){
+  googlemap.gpxtracks.map((e) => {
+    e.setMap(null);
+  });
+  googlemap.gpxtracks.length = 0;
+  
+  spikes.map((e) => {
+    e.line.setMap(null);
+  });
+  spikes.length = 0;
+}
+
+function hideLoader(){
+  document.getElementById("loader_bg").style.display = "none";
+}
+
+function showLoader(){
+  document.getElementById("loader_bg").style.display = "block";
+}
+
+
+// ドラッグドロップ失敗時にファイルがダウンロードされるのを防止
+window.addEventListener("dragover", function(e){
+  e = e || event;
+  e.preventDefault();
+}, false);
+window.addEventListener("drop", function(e){
+  e = e || event;
+  e.preventDefault();
+}, false);
+</script>
+<script type="application/javascript">
+/*var doNotTrack = false;
+if (!doNotTrack) {
+  window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+  ga('create', 'UA-5655726-3', 'auto');
+  
+  ga('send', 'pageview');
+}*/
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+<style>
+* { margin: 0; padding: 0}
+#wrapper {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#map_canvas {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+}
+#left_panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  height: 100%;
+  background-color: #fff;
+  display: none;
+}
+#left_panel #search_conditions {
+  width: 100%;
+  height: 100px;
+  background: white;
+}
+
+#left_panel fieldset {
+  margin: 5px;
+  padding: 5px;
+}
+
+#left_panel #result_table{
+  width: 100%;
+  height: calc(100% - 100px);
+  overflow-x: hidden;
+  overflow-y: scroll;
+}
+
+#left_panel table {
+  border-collapse: collapse;
+  width: 100%;
+}
+#left_panel table thead {
+  background-color: #eee;
+  position: sticky;
+  top: 0;
+  left: 0;
+}
+#left_panel table tbody {
+  
+}
+#left_panel table td {
+  border-width: 1px 0;
+  border-color: gray;
+  border-style: solid;
+  text-align: center;
+}
+
+#loader_bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(1, 1, 1, 0.25);
+  z-index: 9999;
+}
+#loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px;
+  border-radius: 30px;
+  background: #ddd;
+}
+
+#dist_info {
+  position: absolute;
+  display: none;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  padding: 3px;
+  background-color: #eee;
+  border-radius: 3px;
+  border-width: 1px;
+  border-color: #000;
+  border-style: solid;
+}
+
+.hotel_selected {
+  background: #ccc;
+}
+
+#gpx_file { 
+  display: none;
+}
+
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  background-color: #ddd;
+  opacity: 0.5;
+  display: none;
+}
+
+.dropover {
+  background-color: rgba(240, 240, 240, 0.5);
+  display: block;
+}
+</style>
+</head>
+<body>
+<div id="wrapper">
+<div id="left_panel">
+<div id="search_conditions">
+<fieldset>
+  <legend>検索条件</legend>
+  <div>最終チェックイン時刻: <select id="last_checkin_min">
+   <option value="00:00" selected>すべて</option>
+   <option value="15:00">15:00</option>
+   <option value="16:00">16:00</option>
+   <option value="17:00">17:00</option>
+   <option value="18:00">18:00</option>
+   <option value="19:00">19:00</option>
+   <option value="20:00">20:00</option>
+   <option value="21:00">21:00</option>
+   <option value="22:00">22:00</option>
+   <option value="23:00">23:00</option>
+   <option value="24:00">24:00</option>
+  </select>〜<select id="last_checkin_max">
+   <option value="18:00">18:00</option>
+   <option value="19:00">19:00</option>
+   <option value="20:00">20:00</option>
+   <option value="21:00">21:00</option>
+   <option value="22:00">22:00</option>
+   <option value="23:00">23:00</option>
+   <option value="24:00">24:00</option>
+   <option value="25:00">25:00</option>
+   <option value="26:00">26:00</option>
+   <option value="27:00">27:00</option>
+   <option value="99:99" selected>すべて</option>
+  </select></div>
+  <div><label><input type="checkbox" id="show_hotels_without_last_checkin" checked>最終チェックイン時刻の情報がない宿も表示<label></div>
+  <div><label><input type="checkbox" id="laundry_exists">洗濯機が有る宿のみ表示<label></div>
+  <div><label title="価格情報がない宿は営業していない可能性があります"><input type="checkbox" id="price_info_exists">最低価格情報が有る宿のみ表示<label></div>
+  <!--<div><label><input type="checkbox" id="preserve_results">クリック時に以前検索した結果に追記する<label></div>-->
+</fieldset>
+</div>
+<div id="result_table">
+<table id="table_hotels">
+<thead>
+<tr><th style="width: 2em;">No</th><th>ホテル名</th><th style="width: 11em;">チェックイン</th><th style="width: 4em;">洗濯機</th></tr>
+</thead>
+<tbody id="tbody_hotel">
+</tbody>
+</table>
+</div>
+<div id="message"></div>
+</div>
+<div id="map_canvas"></div>
+</div>
+</div>
+<div id="loader_bg">
+<div id="loader">
+<img src="data:image/svg+xml,%3Csvg width='32' height='32' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid' class='uil-spin'%3E%3Cpath fill='none' class='bk' d='M0 0h100v100H0z'/%3E%3Cg transform='translate(84 50)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(45 -52.355 126.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.12s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.12s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(90 -17 67)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.25s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.25s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(135 -2.355 42.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.37s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.37s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(180 8 25)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.5s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.5s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-135 18.355 7.603)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.62s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.62s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-90 33 -17)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.75s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.75s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-45 68.355 -76.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.87s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.87s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E" width="128" height="128">
+</div>
+</div>
+<input type="file" id="gpx_file" accept=".gpx" />
+<div id="overlay"></div>
+<div id="dist_info"></div>
+</body>
+</html>
