@@ -12,8 +12,10 @@
 <script>
 const googlemap = {
   map: null,
-  gpxtracks: [],
+  lines: [],
+  spike_lines: []
 };
+const trksegs = [];
 const spikes = [];
 
 Promise.all([new Promise(function(resolve, reject){
@@ -36,6 +38,15 @@ function initMap(){
     }
   });
   googlemap.map.addListener("contextmenu", clearMap);
+  
+  document.getElementById("spike_length_threshold").addEventListener("change", function(){
+    googlemap.spike_lines.map((e) => {
+      e.setMap(null);
+    });
+    googlemap.spike_lines.length = 0;
+    
+    detectSpike();
+  });
   
   window.initMap_resolve();
 }
@@ -242,45 +253,52 @@ function showGPXRoute(map, coords, color, filename){
       googlemap.dist_marker = null;
     }
   });
-  googlemap.gpxtracks.push(line_display);
+  googlemap.lines.push(line_display);
   line_display.setMap(map);
-  googlemap.gpxtracks.push(line_transparent);
+  googlemap.lines.push(line_transparent);
   line_transparent.setMap(map);
 }
 
 /**
  * ヒゲを検出する
  */
-function detectSpike(coords, threshold1 = 10000, threshold2 = 1000){
-  for(let i = 0; i < coords.length; i++){
-    for(let j = i + 1; j < coords.length; j++){
-      if(coords[j].dist - coords[i].dist > threshold1){
-        break;
-      }
-      if((coords[i].lat === coords[j].lat) && (coords[i].lng === coords[j].lng)){
-        // 折り返している部分が見つかった
-          console.log([i, j, coords[j].dist - coords[i].dist]);
-        
-        // 折り返し部分の距離がthreshold2以下ならヒゲとして検出する
-        if(coords[j].dist - coords[i].dist < threshold2){
-          const spike_line = new google.maps.Polyline({
-            path: coords.slice(i, j + 1),
-            geodesic: true,
-            strokeColor: "#f00",
-            strokeOpacity: 1,
-            strokeWeight: 10,
-            zIndex: 100,
-            map: googlemap.map
-          });
-          
-          spikes.push({
-            start: i,
-            end: j,
-            line: spike_line
-          });
+function detectSpike(){
+  spikes.length = 0;
+  
+  const threshold2 = document.getElementById("spike_length_threshold").value - 0;
+  const threshold1 = threshold2 + 500;
+  
+  for(const coords of trksegs){
+    for(let i = 0; i < coords.length; i++){
+      for(let j = i + 1; j < coords.length; j++){
+        if(coords[j].dist - coords[i].dist > threshold1){
+          break;
         }
-        i = j;
-        break;
+        if((coords[i].lat === coords[j].lat) && (coords[i].lng === coords[j].lng)){
+          // 折り返している部分が見つかった
+          console.log([i, j, coords[j].dist - coords[i].dist, threshold2]);
+          
+          // 折り返し部分の距離がthreshold2以下ならヒゲとして検出する
+          if(coords[j].dist - coords[i].dist < threshold2){
+            const spike_line = new google.maps.Polyline({
+              path: coords.slice(i, j + 1),
+              geodesic: true,
+              strokeColor: "#f00",
+              strokeOpacity: 1,
+              strokeWeight: 10,
+              zIndex: 100,
+              map: googlemap.map
+            });
+            googlemap.spike_lines.push(spike_line);
+            
+            spikes.push({
+              start: i,
+              end: j
+            });
+          }
+          i = j;
+          break;
+        }
       }
     }
   }
@@ -296,8 +314,14 @@ window.addEventListener("DOMContentLoaded", function(){
     try{
       showLoader();
       clearMap();
+      trksegs.length = 0;
 
       const colors = ["#3f3d9a", "#9a3d71", "#9a8c3d", "#3d9a56", "#3d5a9a", "#9a3d90", "#9a6d3d", "#439a3d", "#3d799a", "#843d9a", "#9a4e3d", "#629a3d"];
+      let min_lat = Number.MAX_VALUE;
+      let min_lng = Number.MAX_VALUE;
+      let max_lat = -Number.MAX_VALUE;
+      let max_lng = -Number.MAX_VALUE;
+      
       for(let i = 0; i < evt.target.files.length; i++){
         console.log(evt.target.files[i]);
         const xml = await readXML(evt.target.files[i]);
@@ -310,10 +334,27 @@ window.addEventListener("DOMContentLoaded", function(){
         }
         
         if(coords){
+          trksegs.push(coords);
+          
           showGPXRoute(googlemap.map, coords, colors[i % colors.length], evt.target.files[i].name);
-          detectSpike(coords);
+          
+          for(let i = 0; i < coords.length; i++){
+            if(coords[i].lat < min_lat) min_lat = coords[i].lat;
+            if(coords[i].lng < min_lng) min_lng = coords[i].lng;
+            if(coords[i].lat > max_lat) max_lat = coords[i].lat;
+            if(coords[i].lng > max_lng) max_lng = coords[i].lng;
+          }
         }
       }
+      
+      googlemap.map.fitBounds({
+        south: min_lat,
+        west: min_lng,
+        north: max_lat,
+        east: max_lng
+      });
+      
+      detectSpike();
 
     }catch(err){
       console.error(err);
@@ -353,15 +394,15 @@ window.addEventListener("DOMContentLoaded", function(){
 });
 
 function clearMap(){
-  googlemap.gpxtracks.map((e) => {
+  googlemap.lines.map((e) => {
     e.setMap(null);
   });
-  googlemap.gpxtracks.length = 0;
+  googlemap.lines.length = 0;
   
-  spikes.map((e) => {
-    e.line.setMap(null);
+  googlemap.spike_lines.map((e) => {
+    e.setMap(null);
   });
-  spikes.length = 0;
+  googlemap.spike_lines.length = 0;
 }
 
 function hideLoader(){
@@ -400,58 +441,21 @@ if (!doNotTrack) {
   height: 100%;
   overflow: hidden;
 }
+
 #map_canvas {
   position: absolute;
-  top: 0;
+  top: 50px;
   right: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 50px);
 }
-#left_panel {
+#top_panel {
   position: absolute;
   top: 0;
   left: 0;
-  width: 25%;
-  height: 100%;
-  background-color: #fff;
-  display: none;
-}
-#left_panel #search_conditions {
   width: 100%;
-  height: 100px;
-  background: white;
-}
-
-#left_panel fieldset {
-  margin: 5px;
-  padding: 5px;
-}
-
-#left_panel #result_table{
-  width: 100%;
-  height: calc(100% - 100px);
-  overflow-x: hidden;
-  overflow-y: scroll;
-}
-
-#left_panel table {
-  border-collapse: collapse;
-  width: 100%;
-}
-#left_panel table thead {
-  background-color: #eee;
-  position: sticky;
-  top: 0;
-  left: 0;
-}
-#left_panel table tbody {
-  
-}
-#left_panel table td {
-  border-width: 1px 0;
-  border-color: gray;
-  border-style: solid;
-  text-align: center;
+  height: 50px;
+  background-color: #ddd;
 }
 
 #loader_bg {
@@ -492,7 +496,7 @@ if (!doNotTrack) {
 }
 
 #gpx_file { 
-  display: none;
+  /*display: none;*/
 }
 
 #overlay {
@@ -515,51 +519,17 @@ if (!doNotTrack) {
 </head>
 <body>
 <div id="wrapper">
-<div id="left_panel">
-<div id="search_conditions">
-<fieldset>
-  <legend>検索条件</legend>
-  <div>最終チェックイン時刻: <select id="last_checkin_min">
-   <option value="00:00" selected>すべて</option>
-   <option value="15:00">15:00</option>
-   <option value="16:00">16:00</option>
-   <option value="17:00">17:00</option>
-   <option value="18:00">18:00</option>
-   <option value="19:00">19:00</option>
-   <option value="20:00">20:00</option>
-   <option value="21:00">21:00</option>
-   <option value="22:00">22:00</option>
-   <option value="23:00">23:00</option>
-   <option value="24:00">24:00</option>
-  </select>〜<select id="last_checkin_max">
-   <option value="18:00">18:00</option>
-   <option value="19:00">19:00</option>
-   <option value="20:00">20:00</option>
-   <option value="21:00">21:00</option>
-   <option value="22:00">22:00</option>
-   <option value="23:00">23:00</option>
-   <option value="24:00">24:00</option>
-   <option value="25:00">25:00</option>
-   <option value="26:00">26:00</option>
-   <option value="27:00">27:00</option>
-   <option value="99:99" selected>すべて</option>
-  </select></div>
-  <div><label><input type="checkbox" id="show_hotels_without_last_checkin" checked>最終チェックイン時刻の情報がない宿も表示<label></div>
-  <div><label><input type="checkbox" id="laundry_exists">洗濯機が有る宿のみ表示<label></div>
-  <div><label title="価格情報がない宿は営業していない可能性があります"><input type="checkbox" id="price_info_exists">最低価格情報が有る宿のみ表示<label></div>
-  <!--<div><label><input type="checkbox" id="preserve_results">クリック時に以前検索した結果に追記する<label></div>-->
-</fieldset>
-</div>
-<div id="result_table">
-<table id="table_hotels">
-<thead>
-<tr><th style="width: 2em;">No</th><th>ホテル名</th><th style="width: 11em;">チェックイン</th><th style="width: 4em;">洗濯機</th></tr>
-</thead>
-<tbody id="tbody_hotel">
-</tbody>
-</table>
-</div>
-<div id="message"></div>
+<div id="top_panel">
+<input type="file" id="gpx_file" accept=".gpx" />
+<label for="spike_length_threshold">閾値: <select id="spike_length_threshold">
+ <option value="100">100m</option>
+ <option value="200">200m</option>
+ <option value="500">500m</option>
+ <option value="1000" selected>1000m</option>
+ <option value="2000">2000m</option>
+ <option value="5000">5000m</option>
+ <option value="10000">10000m</option>
+</select></label>
 </div>
 <div id="map_canvas"></div>
 </div>
@@ -569,7 +539,6 @@ if (!doNotTrack) {
 <img src="data:image/svg+xml,%3Csvg width='32' height='32' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid' class='uil-spin'%3E%3Cpath fill='none' class='bk' d='M0 0h100v100H0z'/%3E%3Cg transform='translate(84 50)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(45 -52.355 126.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.12s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.12s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(90 -17 67)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.25s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.25s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(135 -2.355 42.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.37s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.37s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(180 8 25)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.5s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.5s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-135 18.355 7.603)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.62s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.62s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-90 33 -17)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.75s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.75s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Cg transform='rotate(-45 68.355 -76.397)'%3E%3Ccircle r='8'%3E%3Canimate attributeName='opacity' from='1' to='.1' begin='0.87s' dur='1s' repeatCount='indefinite'/%3E%3CanimateTransform attributeName='transform' type='scale' from='1.5' to='1' begin='0.87s' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E" width="128" height="128">
 </div>
 </div>
-<input type="file" id="gpx_file" accept=".gpx" />
 <div id="overlay"></div>
 <div id="dist_info"></div>
 </body>
