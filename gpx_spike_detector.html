@@ -164,12 +164,14 @@ function parseTCX(tcx){
     let lat = trkpts[i].querySelector("LatitudeDegrees").textContent - 0;
     let lng = trkpts[i].querySelector("LongitudeDegrees").textContent - 0;
 
-    d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
-    coords.push({
-      lat: lat,
-      lng: lng,
-      dist: d
-    });
+    if((coords[coords.length - 1].lat !== lat) && (coords[coords.length - 1].lng !== lng)){
+      d += hubeny(coords[coords.length - 1].lat, coords[coords.length - 1].lng, lat, lng);
+      coords.push({
+        lat: lat,
+        lng: lng,
+        dist: d
+      });
+    }
   }
 
   return coords;
@@ -308,9 +310,9 @@ function detectSpike(){
 }
 
 window.addEventListener("DOMContentLoaded", function(){
-  // GPX読み込み対応
+  // GPX/TCX読み込み対応
   document.getElementById("gpx_file").addEventListener("change", async function(evt){
-    // GPXファイルの読み込み
+    // GPX/TCXファイルの読み込み
     try{
       showLoader();
       clearMap();
@@ -533,7 +535,7 @@ if (!doNotTrack) {
 <body>
 <div id="wrapper">
 <div id="top_panel">
-<div id="flexbox_gpx_file"><input type="file" id="gpx_file" accept=".gpx" /></div>
+<div id="flexbox_gpx_file"><input type="file" id="gpx_file" accept=".gpx,.tcx" multiple /></div>
 <div id="flexbox_threshold">
 <label for="spike_length_threshold">閾値: <select id="spike_length_threshold">
  <option value="100">100m</option>
