@@ -444,18 +444,31 @@ if (!doNotTrack) {
 
 #map_canvas {
   position: absolute;
-  top: 50px;
+  top: 25px;
   right: 0;
   width: 100%;
-  height: calc(100% - 50px);
+  height: calc(100% - 25px);
 }
 #top_panel {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 50px;
+  height: 25px;
   background-color: #ddd;
+  display: flex;
+}
+#flexbox_gpx_file {
+  flex: 5 5;
+  height: 25px;
+  box-sizing: border-box;
+  padding: 2px;
+}
+#flexbox_threshold {
+  flex: 0 0 120px;
+  height: 25px;
+  box-sizing: border-box;
+  padding: 2px;
 }
 
 #loader_bg {
@@ -520,7 +533,8 @@ if (!doNotTrack) {
 <body>
 <div id="wrapper">
 <div id="top_panel">
-<input type="file" id="gpx_file" accept=".gpx" />
+<div id="flexbox_gpx_file"><input type="file" id="gpx_file" accept=".gpx" /></div>
+<div id="flexbox_threshold">
 <label for="spike_length_threshold">閾値: <select id="spike_length_threshold">
  <option value="100">100m</option>
  <option value="200">200m</option>
@@ -530,6 +544,7 @@ if (!doNotTrack) {
  <option value="5000">5000m</option>
  <option value="10000">10000m</option>
 </select></label>
+</div>
 </div>
 <div id="map_canvas"></div>
 </div>
