@@ -349,13 +349,15 @@ window.addEventListener("DOMContentLoaded", function(){
         }
       }
       
-      googlemap.map.fitBounds({
-        south: min_lat,
-        west: min_lng,
-        north: max_lat,
-        east: max_lng
-      });
-      
+      if(min_lat < Number.MAX_VALUE){
+        googlemap.map.fitBounds({
+          south: min_lat,
+          west: min_lng,
+          north: max_lat,
+          east: max_lng
+        });
+      }
+            
       detectSpike();
 
     }catch(err){
@@ -393,6 +395,11 @@ window.addEventListener("DOMContentLoaded", function(){
       document.getElementById("gpx_file").dispatchEvent(evt);
     }, false)
   };
+});
+
+// 戻るボタンを押されたときにフォームの値が残っているとき
+window.addEventListener("pageshow", function(evt){
+  document.getElementById("gpx_file").dispatchEvent(new Event("change"));
 });
 
 function clearMap(){
