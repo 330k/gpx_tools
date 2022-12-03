@@ -564,6 +564,12 @@ window.addEventListener("DOMContentLoaded", function(){
   }
 });
 
+// 戻るボタンで戻ってフォームの値が残っているとき
+window.addEventListener("pageshow", function(evt){
+  document.getElementById("file_base").dispatchEvent(new Event("change"));
+  document.getElementById("file_target").dispatchEvent(new Event("change"));
+});
+
 /**
  * Google Maps JavaScript API Initialize Callback
  */
