@@ -689,18 +689,19 @@ function readXML(file){
 
 /**
  * GPXファイルを読み込んでコースの緯度経度座標の配列とコースポイントの配列のデータにする
- * @param {XMLDocument} gpx
+ * @param {string} file 読み込むファイル
  * @param {number} speed 計算に使用する移動速度 [m/s]
  * @param {number} dp_threshold 間引きの閾値 [m] (0なら間引きしない)
  * @return {[{name:string,coords:[],coursepoints:[]}]} courses
  */
-function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
+async function parseGPX(file, speed = 15.0 / 3.6, dp_threshold = 0.0){
+  const gpx = await readXML(file);
   const trkpts = gpx.querySelectorAll("trkpt");
   if(trkpts.length === 0){
-    return;
+    return [];
   }
 
-  const name = gpx.querySelector("trk > name")?.textContent || gpx.querySelector("name")?.textContent || (new Date().toLocaleString());
+  const name = gpx.querySelector("trk > name")?.textContent || gpx.querySelector("name")?.textContent || file.name.replace(/(.+)\.gpx$/i, "$1");
   let coords = [];
 
   // trkpt要素を走査
@@ -967,8 +968,7 @@ window.addEventListener("DOMContentLoaded", function(){
       const output_format = document.getElementById("output_format").value;
 
       for(const file of evt.target.files){
-        const gpx = await readXML(file);
-        const courses = parseGPX(gpx, speed, dp_threshold);
+        const courses = await parseGPX(file, speed, dp_threshold);
         
         for(const course of courses){
           if(output_format === "FIT"){
