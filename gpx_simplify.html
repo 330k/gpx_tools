@@ -113,8 +113,8 @@ const filenames = [];
 // UI初期化
 {
   document.getElementById("gpx_files").addEventListener("change", selectGPXFile);
-  document.getElementById("gpx_files").addEventListener("click", function(){
-    document.getElementById("gpx_files").value = "";
+  document.getElementById("gpx_files").addEventListener("click", function(e){
+    e.target.value = "";
   });
   document.getElementById("process_gpx").addEventListener("click", processGPX);
   try{

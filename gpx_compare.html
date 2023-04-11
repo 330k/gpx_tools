@@ -489,8 +489,8 @@ window.addEventListener("DOMContentLoaded", function(){
       
     }
   });
-  document.getElementById("file_base").addEventListener("click", function(){
-    document.getElementById("file_base").value = "";
+  document.getElementById("file_base").addEventListener("click", function(evt){
+    evt.target.value = "";
   });
   
   // GPX読み込み(比較対象ルート)
@@ -519,8 +519,8 @@ window.addEventListener("DOMContentLoaded", function(){
       
     }
   });
-  document.getElementById("file_target").addEventListener("click", function(){
-    document.getElementById("file_target").value = "";
+  document.getElementById("file_target").addEventListener("click", function(evt){
+    evt.target.value = "";
   });
   
   document.getElementById("input_threshold").addEventListener("change", async function(evt){

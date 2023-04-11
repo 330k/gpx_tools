@@ -987,8 +987,8 @@ window.addEventListener("DOMContentLoaded", function(){
       
     }
   });
-  document.getElementById("gpx_file").addEventListener("click", function(){
-    document.getElementById("gpx_file").value = "";
+  document.getElementById("gpx_file").addEventListener("click", function(e){
+    e.target.value = "";
   });
   
   // ドラッグドロップ対応
