@@ -700,7 +700,7 @@ function parseGPX(gpx, speed = 15.0 / 3.6, dp_threshold = 0.0){
     return;
   }
 
-  const name = gpx.querySelector("trk > name").textContent;
+  const name = gpx.querySelector("trk > name")?.textContent || gpx.querySelector("name")?.textContent || (new Date().toLocaleString());
   let coords = [];
 
   // trkpt要素を走査
