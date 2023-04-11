@@ -368,6 +368,9 @@ window.addEventListener("DOMContentLoaded", function(){
       
     }
   });
+  document.getElementById("gpx_file").addEventListener("click", function(){
+    document.getElementById("gpx_file").value = "";
+  });
 
   // ドラッグドロップ対応
   {
@@ -473,20 +476,22 @@ html, body {
   flex: 1 1 auto;
 }
 #top_panel {
-  flex: 0 0 25px;
+  flex: 0 0 32px;
+  line-height: 32px;
+  vertical-align: middle;
   width: 100%;
   background-color: #ddd;
   display: flex;
 }
 #flexbox_gpx_file {
   flex: 5 5;
-  height: 25px;
+  height: 32px;
   box-sizing: border-box;
   padding: 2px;
 }
 #flexbox_threshold {
-  flex: 0 0 120px;
-  height: 25px;
+  flex: 0 0 150px;
+  height: 32px;
   box-sizing: border-box;
   padding: 2px;
 }
