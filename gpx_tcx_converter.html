@@ -874,16 +874,13 @@ async function parseGPX(file, speed = 15.0 / 3.6, dp_threshold = 0.0){
       });
     }
     
-    // 時刻と距離を修正
+    // 距離を修正
     const dist_base = cs[0].dist;
-    const time_base = cs[0].time;
     for(const c of cs){
       c.dist = c.dist - dist_base;
-      //c.time = c.time - time_base;
     }
     for(const p of ps){
       p.dist = p.dist - dist_base;
-      //p.time = p.time - time_base;
     }
     
     result.push({
@@ -989,6 +986,9 @@ window.addEventListener("DOMContentLoaded", function(){
       hideLoader();
       
     }
+  });
+  document.getElementById("gpx_file").addEventListener("click", function(){
+    document.getElementById("gpx_file").value = "";
   });
   
   // ドラッグドロップ対応
