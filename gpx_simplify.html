@@ -232,6 +232,9 @@ function readGPX(file, index){
  * 処理実行ボタンイベントハンドラ
  */
 async function processGPX(){
+  if(xmltexts.length === 0){
+    return null;
+  }
   try{
     document.getElementById("gpx_download").innerText = "";
     document.getElementById("process_gpx").disabled = true;
