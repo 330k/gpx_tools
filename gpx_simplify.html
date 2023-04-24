@@ -247,13 +247,13 @@ async function processGPX(){
     if(document.getElementById("merge_trkseg").checked === true){
       mergeTrkseg(xmldocs);
     }
-    if(document.getElementById("split_trkseg").value > 0){
+    if(document.getElementById("split_trkseg").value - 0 > 0){
       splitTrkseg(xmldocs, document.getElementById("split_trkseg").value * 3600 * 1000);
     }
-    if(document.getElementById("reduce_points").value > 0){
+    if(document.getElementById("reduce_points").value - 0 >= 2){
       reducePoints(xmldocs, document.getElementById("reduce_points").value - 0);
     }
-    if(document.getElementById("latlon_precision").value > 0){
+    if(document.getElementById("latlon_precision").value - 0 > 0){
       setPrecisionLatLon(xmldocs, document.getElementById("latlon_precision").value - 0);
     }
     if(document.getElementById("ele_process").value === "delete"){
