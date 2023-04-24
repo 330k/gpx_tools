@@ -131,6 +131,9 @@ const filenames = [];
     for(let p in options.select){
       document.getElementById(p).value = options.select[p];
     }
+    for(let p in options.text){
+      document.getElementById(p).value = options.text[p];
+    }
   }catch(e){
   }
   window.addEventListener("load", function(){
@@ -302,6 +305,10 @@ async function processGPX(){
       options.select = {};
       for(i of document.querySelectorAll("select")){
         options.select[i.id] = i.value;
+      }
+      options.text = {};
+      for(i of document.querySelectorAll("input[type='text'],input[type='number']")){
+        options.text[i.id] = i.value;
       }
       localStorage.setItem("previousoptions", JSON.stringify(options));
     }
