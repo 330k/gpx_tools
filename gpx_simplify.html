@@ -79,7 +79,7 @@ ul li input[type=checkbox]#reduce_points_input_direct { position: static; }
   <li>高度の削除/精度/修正<br />
    <select id="ele_process">
     <option value="null">変更なし</option>
-    <option value="delete">ele要素を削除</option>
+    <option value="delete">削除</option>
     <option value="toFixed_0">整数に丸める</option>
     <option value="toFixed_1" selected="selected">小数点以下1桁</option>
     <option value="toFixed_2">小数点以下2桁</option>
@@ -317,6 +317,7 @@ async function processGPX(){
     }
     
   }catch(e){
+    console.log(e);
     document.getElementById("gpx_download").innerText = "Error: " + e.message;
   }finally{
     document.getElementById("process_gpx").disabled = false;
@@ -328,13 +329,35 @@ async function processGPX(){
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
  */
 function mergeGPX(gpxdocs){
-  for(let i = 1; i < gpxdocs.length; i++){
-    let nodes = gpxdocs[i].querySelectorAll("gpx > wpt, gpx > rte, gpx > trk");
-    for(let j = 0; j < nodes.length; j++){
-      gpxdocs[0].documentElement.appendChild(nodes[j]);
+  if(gpxdocs.length > 1){
+    const newnodes = [];
+    
+    // wpt, rte, trkの順に追加
+    for(const query of ["gpx > wpt", "gpx > rte", "gpx > trk"]){
+      for(let i = 0; i < gpxdocs.length; i++){
+        let nodes = gpxdocs[i].querySelectorAll(query);
+        for(let j = 0; j < nodes.length; j++){
+          newnodes.push(nodes[j].cloneNode(true));
+        }
+      }
     }
+    
+    // 最初のファイルにextensions要素が存在する場合は追加
+    if(gpxdocs[0].querySelector("gpx > extensions")){
+      newnodes.push(gpxdocs[0].querySelector("gpx > extensions").cloneNode(true));
+    }
+    
+    // wpt, rte, trk, extensions要素を一旦削除
+    let nodes = gpxdocs[0].querySelectorAll("gpx > wpt, gpx > rte, gpx > trk, gpx > extensions");
+    for(let i = 0; i < nodes.length; i++){
+      gpxdocs[0].documentElement.removeChild(nodes[i]);
+    }
+    // newnodesを追加
+    for(let i = 0; i < newnodes.length; i++){
+      gpxdocs[0].documentElement.appendChild(newnodes[i]);
+    }
+    gpxdocs.length = 1;
   }
-  gpxdocs.length = 1;
 }
 
 /**
