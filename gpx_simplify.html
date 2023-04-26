@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <!--
-    Copyright (c) 2014-2021 Kei Misawa
+    Copyright (c) 2014-2023 Kei Misawa
 
     This software is released under the MIT License.
 
@@ -29,7 +29,7 @@ ul li input[type=checkbox]#reduce_points_input_direct { position: static; }
 <div id="wrapper">
 <fieldset>
  <legend>対象GPXファイル(複数選択可)</legend>
- <input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
+ <label><input type="file" id="gpx_files" multiple="multiple" accept=".gpx" /></label><br />
  <div id="gpx_filenames"></div>
 </fieldset>
 <fieldset>
@@ -88,9 +88,10 @@ ul li input[type=checkbox]#reduce_points_input_direct { position: static; }
     <option value="gsi">国土地理院APIの標高に修正</option>
    </select>
   </li>
-  <li><label><input type="checkbox" id="delete_time" />時刻を削除</label></li>
-  <li><label><input type="checkbox" id="delete_others" checked="checked" />高度と時刻以外の情報を削除</label></li>
-  <li><label><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label></li>
+  <li><label title="各trkpt要素内のtime要素を削除します"><input type="checkbox" id="delete_time" />時刻を削除</label></li>
+  <li><label title="各trkpt要素内のele要素、time要素以外を削除します"><input type="checkbox" id="delete_others" checked="checked" />高度と時刻以外の情報を削除</label></li>
+  <li><label title="GPXファイル中の無駄なスペースを削除します"><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label></li>
+  <li><label title="GPX中のname要素(gpx/metadata/nameとgpx/trk/name)をファイル名で置き換えます"><input type="checkbox" id="set_gpxtrk_name" />name要素をファイル名で書き換える</label></li>
   <li><label>GPXファイル名<br />
    <select id="change_name">
     <option value="null" selected="selected">変更なし</option>
@@ -282,13 +283,17 @@ async function processGPX(){
       deleteWhitespaces(xmldocs);
     }
     
+    if(document.getElementById("set_gpxtrk_name").checked === true){
+      setGPXNamesFromFileNames(xmldocs, filenames);
+    }
+    
     let downloadnames;
     if(document.getElementById("change_name").value === "fromname"){
       downloadnames = getGPXNames(xmldocs).map((x) => x + ".gpx");
     }else if(document.getElementById("change_name").value === "prefix_simplified"){
       downloadnames = filenames.map((x) => "simplified_" + x);
     }else if(document.getElementById("change_name").value === "suffix_simplified"){
-      downloadnames = filenames.map((x) => x.replace(/\.gpx/i, "_simplified.gpx"));
+      downloadnames = filenames.map((x) => x.replace(/^(.+)\..+?$/i, "$1_simplified.gpx"));
     }else{
       downloadnames = filenames;
     }
@@ -1019,6 +1024,33 @@ async function addElevationGSI(gpxdocs){
     
   };
 })(this);
+
+/**
+ * 各GPXのname要素をファイル名にする
+ * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
+ * @param {Array<string>} filenames 処理対象GPXファイルのファイル名
+ */
+function setGPXNamesFromFileNames(gpxdocs, filenames){
+  const basenames = filenames.map(e => e.replace(/^(.+)\..+?$/i, "$1"));
+  
+  for(let i = 0; i < gpxdocs.length; i++){
+    // gpx/metadata/nameはファイル名をそのまま設定
+    const metadata_name = gpxdocs[i].querySelector("gpx > metadata > name");
+    if(metadata_name !== null){
+      metadata_name.textContent = basenames[i];
+    }
+    
+    // gpx/trk/nameが1つしかない時はファイル名をそのまま設定、複数ある時はファイル名_${j}にする
+    const trk_names = gpxdocs[i].querySelectorAll("gpx > trk > name");
+    if(trk_names.length === 1){
+      trk_names[0].textContent = basenames[i];
+    }else{
+      for(let j = 0; j < trk_names.length; j++){
+        trk_names[j].textContent = basenames[i] + "_" + j;
+      }
+    }
+  }
+}
 
 /**
  * 各GPXのname要素を取得して配列として返す
