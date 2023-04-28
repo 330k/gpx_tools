@@ -300,6 +300,7 @@ function processGPX(){
       if(document.getElementById("delete_others").checked === true){
         console.time("deleteElements-others");
         deleteElements(xmldocs, "trkpt > *", "ele, time");
+        //deleteElements(xmldocs, "trkpt > *:not(ele, time)", ""); // CSS Selector Level 4
         console.timeEnd("deleteElements-others");
       }
       
@@ -695,6 +696,7 @@ function deleteElements(gpxdocs, selector, excepts){
     for(let node of nodes){
       if((excepts === "") || (!node.matches(excepts))){
         node.parentNode.removeChild(node);
+        //node.remove(); どちらも動作する
       }
     }
     console.log("remove '" + selector + "' except '" + excepts + "': " + nodes.length + " to " + gpxdoc.querySelectorAll(selector).length);
