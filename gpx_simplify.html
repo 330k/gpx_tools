@@ -1078,35 +1078,39 @@ function setGPXNamesFromFileNames(gpxdocs, filenames){
   const basenames = filenames.map(e => e.replace(/^(.+)\..+?$/i, "$1"));
   
   for(let i = 0; i < gpxdocs.length; i++){
-    // gpx/metadata/nameはファイル名をそのまま設定
-    let metadata_name = gpxdocs[i].querySelector("gpx > metadata > name");
+    const gpxdoc = gpxdocs[i];
+    const basename = basenames[i];
+    
+    // gpx/metadata/name(GPX1.1)かgpx/name(GPX1.0)はファイル名をそのまま設定
+    let metadata_name = gpxdoc.querySelector("gpx > metadata > name, gpx > name");
     if(metadata_name !== null){
-      metadata_name.textContent = basenames[i];
+      metadata_name.textContent = basename;
     }else{
-      metadata_name = gpxdocs[i].createElementNS(gpxdocs[i].documentElement.namespaceURI, "name");
-      metadata_name.textContent = basenames[i];
-      gpxdocs[i].querySelector("gpx > metadata").prepend(metadata_name);
+      metadata_name = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "name");
+      metadata_name.textContent = basename;
+      const parent = gpxdoc.querySelector("gpx > metadata") || gpxdoc.querySelector("gpx");
+      parent.prepend(metadata_name);
     }
     
     // trkが1つしかない時はファイル名をそのまま設定、複数ある時はファイル名_${j}にする
-    const trks = gpxdocs[i].querySelectorAll("gpx > trk");
+    const trks = gpxdoc.querySelectorAll("gpx > trk");
     if(trks.length === 1){
       let trk_name = trks[0].querySelector("name");
       if(trk_name !== null){
-        trk_name.textContent = basenames[i];
+        trk_name.textContent = basename;
       }else{
-        trk_name = gpxdocs[i].createElementNS(gpxdocs[i].documentElement.namespaceURI, "name");
-        trk_name.textContent = basenames[i];
+        trk_name = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "name");
+        trk_name.textContent = basename;
         trks[0].prepend(trk_name); // name要素はtrkの子要素の中で先頭に来る
       }
     }else{
       for(let j = 0; j < trks.length; j++){
         let trk_name = trks[j].querySelector("name");
         if(trk_name !== null){
-          trk_name.textContent = basenames[i] + "_" + (j + 1);
+          trk_name.textContent = basename + "_" + (j + 1);
         }else{
-          trk_name = gpxdocs[i].createElementNS(gpxdocs[i].documentElement.namespaceURI, "name");
-          trk_name.textContent = basenames[i] + "_" + (j + 1);
+          trk_name = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "name");
+          trk_name.textContent = basename + "_" + (j + 1);
           trks[j].prepend(trk_name); // name要素はtrkの子要素の中で先頭に来る
         }
       }
