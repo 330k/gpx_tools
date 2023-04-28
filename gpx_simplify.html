@@ -91,7 +91,7 @@ ul li input[type=checkbox]#reduce_points_input_direct { position: static; }
   <li><label title="各trkpt要素内のtime要素を削除します"><input type="checkbox" id="delete_time" />時刻を削除</label></li>
   <li><label title="各trkpt要素内のele要素、time要素以外を削除します"><input type="checkbox" id="delete_others" checked="checked" />高度と時刻以外の情報を削除</label></li>
   <li><label title="GPXファイル中の無駄なスペースを削除します"><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label></li>
-  <li><label title="GPX中のname要素(gpx/metadata/nameとgpx/trk/name)をファイル名で置き換えます"><input type="checkbox" id="set_gpxtrk_name" />name要素をファイル名で書き換える</label></li>
+  <li><label title="GPXファイル中のname要素(gpx/metadata/nameとgpx/trk/name)をファイル名に置き換えます"><input type="checkbox" id="set_gpxtrk_name" />name要素をファイル名で書き換える</label></li>
   <li><label>GPXファイル名<br />
    <select id="change_name">
     <option value="null" selected="selected">変更なし</option>
@@ -243,48 +243,76 @@ async function processGPX(){
     const xmldocs = xmltexts.map((e, i) => parser.parseFromString(e, "text/xml"));
 
     if(document.getElementById("merge_gpx").checked === true){
+      console.time("mergeGPX");
       mergeGPX(xmldocs);
+      console.timeEnd("mergeGPX");
     }
     if(document.getElementById("merge_trk").checked === true){
+      console.time("mergeTrk");
       mergeTrk(xmldocs);
+      console.timeEnd("mergeTrk");
     }
     if(document.getElementById("merge_trkseg").checked === true){
+      console.time("mergeTrkseg");
       mergeTrkseg(xmldocs);
+      console.timeEnd("mergeTrkseg");
     }
     if(document.getElementById("split_trkseg").value - 0 > 0){
+      console.time("splitTrkseg");
       splitTrkseg(xmldocs, document.getElementById("split_trkseg").value * 3600 * 1000);
+      console.timeEnd("splitTrkseg");
     }
     if(document.getElementById("reduce_points").value - 0 >= 2){
+      console.time("reducePoints");
       reducePoints(xmldocs, document.getElementById("reduce_points").value - 0);
+      console.timeEnd("reducePoints");
     }
     if(document.getElementById("latlon_precision").value - 0 > 0){
+      console.time("setPrecisionLatLon");
       setPrecisionLatLon(xmldocs, document.getElementById("latlon_precision").value - 0);
+      console.timeEnd("setPrecisionLatLon");
     }
     if(document.getElementById("ele_process").value === "delete"){
+      console.time("deleteElements-ele");
       deleteElements(xmldocs, "trkpt > ele, rtept > ele, wpt > ele", "");
+      console.timeEnd("deleteElements-ele");
     }
     if(document.getElementById("ele_process").value.match(/toFixed_(\d+)/)){
+      console.time("setPrecisionEle");
       setPrecisionEle(xmldocs, document.getElementById("ele_process").value.match(/toFixed_(\d+)/)[1] - 0);
+      console.timeEnd("setPrecisionEle");
     }
     if(document.getElementById("ele_process").value === "google"){
+      console.time("addElevation");
       await addElevation(xmldocs);
+      console.timeEnd("addElevation");
     }
     if(document.getElementById("ele_process").value === "gsi"){
+      console.time("addElevationGSI");
       await addElevationGSI(xmldocs);
+      console.timeEnd("addElevationGSI");
     }
     if(document.getElementById("delete_time").checked === true){
+      console.time("deleteElements-time");
       deleteElements(xmldocs, "trkpt > time, rtept > time, wpt > time", "");
+      console.timeEnd("deleteElements-time");
     }
     if(document.getElementById("delete_others").checked === true){
+      console.time("deleteElements-others");
       deleteElements(xmldocs, "trkpt > *", "ele, time");
+      console.timeEnd("deleteElements-others");
     }
     
     if(document.getElementById("delete_whitespaces").checked === true){
+      console.time("deleteWhitespaces");
       deleteWhitespaces(xmldocs);
+      console.timeEnd("deleteWhitespaces");
     }
     
     if(document.getElementById("set_gpxtrk_name").checked === true){
+      console.time("setGPXNamesFromFileNames");
       setGPXNamesFromFileNames(xmldocs, filenames);
+      console.timeEnd("setGPXNamesFromFileNames");
     }
     
     let downloadnames;
@@ -651,8 +679,8 @@ function setPrecisionEle(gpxdocs, precision){
 /**
  * 指定したselectorに合致する要素を削除する
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
- * @param {int} selector 削除対象のselector文字列
- * @param {int} excepts 削除しない対象のselector文字列
+ * @param {string} selector 削除対象のselector文字列
+ * @param {string} excepts 削除しない対象のselector文字列
  */
 function deleteElements(gpxdocs, selector, excepts){
   // IE, Edgeに対応
@@ -678,6 +706,17 @@ function deleteElements(gpxdocs, selector, excepts){
 function deleteWhitespaces(gpxdocs){
   for(const gpxdoc of gpxdocs){
     _deleteWhitespaces(gpxdoc.documentElement);
+    
+    // 特定の要素の前に改行を入れる
+    for(const n of gpxdoc.querySelectorAll("gpx > *, rtept, trkpt")){
+      const cr = gpxdoc.createTextNode("\n");
+      n.before(cr);
+    }
+    // 特定の要素の後に改行を入れる
+    /*for(const n of gpxdoc.querySelectorAll("")){
+      const cr = gpxdoc.createTextNode("\n");
+      n.after(cr);
+    }//*/
   }
 
   // 再帰的にホワイトスペースを削除する
@@ -690,8 +729,9 @@ function deleteWhitespaces(gpxdocs){
       }
       if((child.nodeType === 3) && child.nodeValue.match(/^\s+$/)){
         // ホワイトスペースだけのテキストノードの場合
-        // 空白文字を削除　及び連続する改行は1つにする
-        child.nodeValue = child.nodeValue.replace(/[\t ]+/g, "").replace(/[\r\n]+/g, "\n"); 
+        // 空白文字を削除　及び連続する改行は1つにする -> 空白文字や改行をすべて削除
+        //child.nodeValue = child.nodeValue.replace(/[\t ]+/g, "").replace(/[\r\n]+/g, "\n"); 
+        child.nodeValue = "";
       }
     }
   }
@@ -1035,18 +1075,36 @@ function setGPXNamesFromFileNames(gpxdocs, filenames){
   
   for(let i = 0; i < gpxdocs.length; i++){
     // gpx/metadata/nameはファイル名をそのまま設定
-    const metadata_name = gpxdocs[i].querySelector("gpx > metadata > name");
+    let metadata_name = gpxdocs[i].querySelector("gpx > metadata > name");
     if(metadata_name !== null){
       metadata_name.textContent = basenames[i];
+    }else{
+      metadata_name = gpxdocs[i].createElementNS(gpxdocs[i].documentElement.namespaceURI, "name");
+      metadata_name.textContent = basenames[i];
+      gpxdocs[i].querySelector("gpx > metadata").prepend(metadata_name);
     }
     
-    // gpx/trk/nameが1つしかない時はファイル名をそのまま設定、複数ある時はファイル名_${j}にする
-    const trk_names = gpxdocs[i].querySelectorAll("gpx > trk > name");
-    if(trk_names.length === 1){
-      trk_names[0].textContent = basenames[i];
+    // trkが1つしかない時はファイル名をそのまま設定、複数ある時はファイル名_${j}にする
+    const trks = gpxdocs[i].querySelectorAll("gpx > trk");
+    if(trks.length === 1){
+      let trk_name = trks[0].querySelector("name");
+      if(trk_name !== null){
+        trk_name.textContent = basenames[i];
+      }else{
+        trk_name = gpxdocs[i].createElementNS(gpxdocs[i].documentElement.namespaceURI, "name");
+        trk_name.textContent = basenames[i];
+        trks[0].prepend(trk_name); // name要素はtrkの子要素の中で先頭に来る
+      }
     }else{
-      for(let j = 0; j < trk_names.length; j++){
-        trk_names[j].textContent = basenames[i] + "_" + j;
+      for(let j = 0; j < trks.length; j++){
+        let trk_name = trks[j].querySelector("name");
+        if(trk_name !== null){
+          trk_name.textContent = basenames[i] + "_" + (j + 1);
+        }else{
+          trk_name = gpxdocs[i].createElementNS(gpxdocs[i].documentElement.namespaceURI, "name");
+          trk_name.textContent = basenames[i] + "_" + (j + 1);
+          trks[j].prepend(trk_name); // name要素はtrkの子要素の中で先頭に来る
+        }
       }
     }
   }
@@ -1090,7 +1148,7 @@ function createGPXDownloadLink(gpxdocs, downloadnames){
       e.href = window.URL.createObjectURL(blob);
       e.setAttribute("target", "_blank");
       e.setAttribute("download", downloadnames[i]);
-      e.appendChild(document.createTextNode("Download " + downloadnames[i]));
+      e.appendChild(document.createTextNode(downloadnames[i]));
 
       if(window.navigator.msSaveBlob){
         // IE, Edge
