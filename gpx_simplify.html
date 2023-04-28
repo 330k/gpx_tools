@@ -232,129 +232,131 @@ function readGPX(file, index){
 /**
  * 処理実行ボタンイベントハンドラ
  */
-async function processGPX(){
+function processGPX(){
   if(xmltexts.length === 0){
     return null;
   }
-  try{
-    document.getElementById("gpx_download").innerText = "";
-    document.getElementById("process_gpx").disabled = true;
-    
-    const xmldocs = xmltexts.map((e, i) => parser.parseFromString(e, "text/xml"));
+  document.getElementById("gpx_download").innerText = "Processing...";
+  document.getElementById("process_gpx").disabled = true;
+  setTimeout(async function(){
+    try{
+      const xmldocs = xmltexts.map((e, i) => parser.parseFromString(e, "text/xml"));
 
-    if(document.getElementById("merge_gpx").checked === true){
-      console.time("mergeGPX");
-      mergeGPX(xmldocs);
-      console.timeEnd("mergeGPX");
-    }
-    if(document.getElementById("merge_trk").checked === true){
-      console.time("mergeTrk");
-      mergeTrk(xmldocs);
-      console.timeEnd("mergeTrk");
-    }
-    if(document.getElementById("merge_trkseg").checked === true){
-      console.time("mergeTrkseg");
-      mergeTrkseg(xmldocs);
-      console.timeEnd("mergeTrkseg");
-    }
-    if(document.getElementById("split_trkseg").value - 0 > 0){
-      console.time("splitTrkseg");
-      splitTrkseg(xmldocs, document.getElementById("split_trkseg").value * 3600 * 1000);
-      console.timeEnd("splitTrkseg");
-    }
-    if(document.getElementById("reduce_points").value - 0 >= 2){
-      console.time("reducePoints");
-      reducePoints(xmldocs, document.getElementById("reduce_points").value - 0);
-      console.timeEnd("reducePoints");
-    }
-    if(document.getElementById("latlon_precision").value - 0 > 0){
-      console.time("setPrecisionLatLon");
-      setPrecisionLatLon(xmldocs, document.getElementById("latlon_precision").value - 0);
-      console.timeEnd("setPrecisionLatLon");
-    }
-    if(document.getElementById("ele_process").value === "delete"){
-      console.time("deleteElements-ele");
-      deleteElements(xmldocs, "trkpt > ele, rtept > ele, wpt > ele", "");
-      console.timeEnd("deleteElements-ele");
-    }
-    if(document.getElementById("ele_process").value.match(/toFixed_(\d+)/)){
-      console.time("setPrecisionEle");
-      setPrecisionEle(xmldocs, document.getElementById("ele_process").value.match(/toFixed_(\d+)/)[1] - 0);
-      console.timeEnd("setPrecisionEle");
-    }
-    if(document.getElementById("ele_process").value === "google"){
-      console.time("addElevation");
-      await addElevation(xmldocs);
-      console.timeEnd("addElevation");
-    }
-    if(document.getElementById("ele_process").value === "gsi"){
-      console.time("addElevationGSI");
-      await addElevationGSI(xmldocs);
-      console.timeEnd("addElevationGSI");
-    }
-    if(document.getElementById("delete_time").checked === true){
-      console.time("deleteElements-time");
-      deleteElements(xmldocs, "trkpt > time, rtept > time, wpt > time", "");
-      console.timeEnd("deleteElements-time");
-    }
-    if(document.getElementById("delete_others").checked === true){
-      console.time("deleteElements-others");
-      deleteElements(xmldocs, "trkpt > *", "ele, time");
-      console.timeEnd("deleteElements-others");
-    }
-    
-    if(document.getElementById("delete_whitespaces").checked === true){
-      console.time("deleteWhitespaces");
-      deleteWhitespaces(xmldocs);
-      console.timeEnd("deleteWhitespaces");
-    }
-    
-    if(document.getElementById("set_gpxtrk_name").checked === true){
-      console.time("setGPXNamesFromFileNames");
-      setGPXNamesFromFileNames(xmldocs, filenames);
-      console.timeEnd("setGPXNamesFromFileNames");
-    }
-    
-    let downloadnames;
-    if(document.getElementById("change_name").value === "fromname"){
-      downloadnames = getGPXNames(xmldocs).map((x) => x + ".gpx");
-    }else if(document.getElementById("change_name").value === "prefix_simplified"){
-      downloadnames = filenames.map((x) => "simplified_" + x);
-    }else if(document.getElementById("change_name").value === "suffix_simplified"){
-      downloadnames = filenames.map((x) => x.replace(/^(.+)\..+?$/i, "$1_simplified.gpx"));
-    }else{
-      downloadnames = filenames;
-    }
-
-    createGPXDownloadLink(xmldocs, downloadnames);
-    
-    // 親ウィンドウにサイズ変更を通知
-    notifyResize();
-    
-    // 現在の設定をlocalStorageに保存
-    {
-      let options = {};
-      options.checkbox = {};
-      for(i of document.querySelectorAll("input[type='checkbox']")){
-        options.checkbox[i.id] = i.checked;
+      if(document.getElementById("merge_gpx").checked === true){
+        console.time("mergeGPX");
+        mergeGPX(xmldocs);
+        console.timeEnd("mergeGPX");
       }
-      options.select = {};
-      for(i of document.querySelectorAll("select")){
-        options.select[i.id] = i.value;
+      if(document.getElementById("merge_trk").checked === true){
+        console.time("mergeTrk");
+        mergeTrk(xmldocs);
+        console.timeEnd("mergeTrk");
       }
-      options.text = {};
-      for(i of document.querySelectorAll("input[type='text'],input[type='number']")){
-        options.text[i.id] = i.value;
+      if(document.getElementById("merge_trkseg").checked === true){
+        console.time("mergeTrkseg");
+        mergeTrkseg(xmldocs);
+        console.timeEnd("mergeTrkseg");
       }
-      localStorage.setItem("previousoptions", JSON.stringify(options));
+      if(document.getElementById("split_trkseg").value - 0 > 0){
+        console.time("splitTrkseg");
+        splitTrkseg(xmldocs, document.getElementById("split_trkseg").value * 3600 * 1000);
+        console.timeEnd("splitTrkseg");
+      }
+      if(document.getElementById("reduce_points").value - 0 >= 2){
+        console.time("reducePoints");
+        reducePoints(xmldocs, document.getElementById("reduce_points").value - 0);
+        console.timeEnd("reducePoints");
+      }
+      if(document.getElementById("latlon_precision").value - 0 > 0){
+        console.time("setPrecisionLatLon");
+        setPrecisionLatLon(xmldocs, document.getElementById("latlon_precision").value - 0);
+        console.timeEnd("setPrecisionLatLon");
+      }
+      if(document.getElementById("ele_process").value === "delete"){
+        console.time("deleteElements-ele");
+        deleteElements(xmldocs, "trkpt > ele, rtept > ele, wpt > ele", "");
+        console.timeEnd("deleteElements-ele");
+      }
+      if(document.getElementById("ele_process").value.match(/toFixed_(\d+)/)){
+        console.time("setPrecisionEle");
+        setPrecisionEle(xmldocs, document.getElementById("ele_process").value.match(/toFixed_(\d+)/)[1] - 0);
+        console.timeEnd("setPrecisionEle");
+      }
+      if(document.getElementById("ele_process").value === "google"){
+        console.time("addElevation");
+        await addElevation(xmldocs);
+        console.timeEnd("addElevation");
+      }
+      if(document.getElementById("ele_process").value === "gsi"){
+        console.time("addElevationGSI");
+        await addElevationGSI(xmldocs);
+        console.timeEnd("addElevationGSI");
+      }
+      if(document.getElementById("delete_time").checked === true){
+        console.time("deleteElements-time");
+        deleteElements(xmldocs, "trkpt > time, rtept > time, wpt > time", "");
+        console.timeEnd("deleteElements-time");
+      }
+      if(document.getElementById("delete_others").checked === true){
+        console.time("deleteElements-others");
+        deleteElements(xmldocs, "trkpt > *", "ele, time");
+        console.timeEnd("deleteElements-others");
+      }
+      
+      if(document.getElementById("delete_whitespaces").checked === true){
+        console.time("deleteWhitespaces");
+        deleteWhitespaces(xmldocs);
+        console.timeEnd("deleteWhitespaces");
+      }
+      
+      if(document.getElementById("set_gpxtrk_name").checked === true){
+        console.time("setGPXNamesFromFileNames");
+        setGPXNamesFromFileNames(xmldocs, filenames);
+        console.timeEnd("setGPXNamesFromFileNames");
+      }
+      
+      let downloadnames;
+      if(document.getElementById("change_name").value === "fromname"){
+        downloadnames = getGPXNames(xmldocs).map((x) => x + ".gpx");
+      }else if(document.getElementById("change_name").value === "prefix_simplified"){
+        downloadnames = filenames.map((x) => "simplified_" + x);
+      }else if(document.getElementById("change_name").value === "suffix_simplified"){
+        downloadnames = filenames.map((x) => x.replace(/^(.+)\..+?$/i, "$1_simplified.gpx"));
+      }else{
+        downloadnames = filenames;
+      }
+      
+      document.getElementById("gpx_download").innerText = "";
+      createGPXDownloadLink(xmldocs, downloadnames);
+      
+      // 親ウィンドウにサイズ変更を通知
+      notifyResize();
+      
+      // 現在の設定をlocalStorageに保存
+      {
+        let options = {};
+        options.checkbox = {};
+        for(i of document.querySelectorAll("input[type='checkbox']")){
+          options.checkbox[i.id] = i.checked;
+        }
+        options.select = {};
+        for(i of document.querySelectorAll("select")){
+          options.select[i.id] = i.value;
+        }
+        options.text = {};
+        for(i of document.querySelectorAll("input[type='text'],input[type='number']")){
+          options.text[i.id] = i.value;
+        }
+        localStorage.setItem("previousoptions", JSON.stringify(options));
+      }
+      
+    }catch(e){
+      console.log(e);
+      document.getElementById("gpx_download").innerText = "Error: " + e.message;
+    }finally{
+      document.getElementById("process_gpx").disabled = false;
     }
-    
-  }catch(e){
-    console.log(e);
-    document.getElementById("gpx_download").innerText = "Error: " + e.message;
-  }finally{
-    document.getElementById("process_gpx").disabled = false;
-  }
+  }, 0);
 }
 
 /**
