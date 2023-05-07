@@ -91,7 +91,7 @@ ul li input[type=checkbox]#reduce_points_input_direct { position: static; }
   <li><label title="各trkpt要素内のtime要素を削除します"><input type="checkbox" id="delete_time" />時刻を削除</label></li>
   <li><label title="各trkpt要素内のele要素、time要素以外を削除します"><input type="checkbox" id="delete_others" checked="checked" />高度と時刻以外の情報を削除</label></li>
   <li><label title="GPXファイル中の無駄なスペースを削除します"><input type="checkbox" id="delete_whitespaces" checked="checked" />無駄な空白を削除</label></li>
-  <li><label title="GPXファイル中のname要素(gpx/metadata/nameとgpx/trk/name)をファイル名に置き換えます"><input type="checkbox" id="set_gpxtrk_name" />name要素をファイル名で書き換える</label></li>
+  <li><label title="GPXファイル中のname要素(gpx/metadata/nameとgpx/trk/name)をファイル名に置き換えます"><input type="checkbox" id="set_gpxtrk_name" />トラック名をファイル名で書き換える</label></li>
   <li><label>GPXファイル名<br />
    <select id="change_name">
     <option value="null" selected="selected">変更なし</option>
@@ -240,7 +240,9 @@ function processGPX(){
   document.getElementById("process_gpx").disabled = true;
   setTimeout(async function(){
     try{
+      console.time("parseXML");
       const xmldocs = xmltexts.map((e, i) => parser.parseFromString(e, "text/xml"));
+      console.timeEnd("parseXML");
 
       if(document.getElementById("merge_gpx").checked === true){
         console.time("mergeGPX");
