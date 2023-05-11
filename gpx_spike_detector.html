@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -244,8 +245,8 @@ function showGPXRoute(map, coords, color, filename){
 
     dist_info.innerHTML = filename + ": " + (0.001 * coords[index_min].dist).toFixed(1) + " km";
     dist_info.style.display = "block";
-    dist_info.style.left = evt.domEvent.pageX - dist_info.clientWidth * 0.5;
-    dist_info.style.top = evt.domEvent.pageY - dist_info.clientHeight - 20;
+    dist_info.style.left = (evt.domEvent.pageX - dist_info.clientWidth * 0.5) + "px";
+    dist_info.style.top = (evt.domEvent.pageY - dist_info.clientHeight - 20) + "px";
 
   });
   line_transparent.addListener("mouseout", function(evt){
@@ -459,6 +460,7 @@ if (!doNotTrack) {
 html, body {
   width: 100%;
   height: 100%;
+  font-size: 16px;
   font-family: sans-serif;
   line-height: 1em;
 }
@@ -487,7 +489,7 @@ html, body {
   flex: 5 5;
   height: 32px;
   box-sizing: border-box;
-  padding: 2px;
+  padding: 0 0 0 2px;
 }
 #flexbox_threshold {
   flex: 0 0 150px;
