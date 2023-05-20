@@ -202,7 +202,7 @@ function latlng2MercatorXY(lat, lng){
   
   return {
     X: lng * DEGREE,
-    Y: Math.asinh(Math.tanh(lat * DEGREE))
+    Y: Math.asinh(Math.tan(lat * DEGREE))
   };
 }
 
