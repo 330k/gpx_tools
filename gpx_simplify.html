@@ -336,7 +336,7 @@ function processGPX(){
       notifyResize();
       
       // 現在の設定をlocalStorageに保存
-      {
+      try{
         let options = {};
         options.checkbox = {};
         for(i of document.querySelectorAll("input[type='checkbox']")){
@@ -351,6 +351,8 @@ function processGPX(){
           options.text[i.id] = i.value;
         }
         localStorage.setItem("previousoptions", JSON.stringify(options));
+      }catch(e){
+        console.log(e);
       }
       
     }catch(e){
