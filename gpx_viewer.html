@@ -38,14 +38,13 @@ const googlemap = {
   objects: [],
   dist_marker: null
 };
-let features = [];
 
 /**
- * テキストファイルを読み込む
- * @param {File}
+ * テキストをFileオブジェクトから読み込む
+ * @param {File} file
  * @return {Promise<String>}
  */
-function loadText(file){
+function loadTextFile(file){
   return new Promise(function(resolve, reject){
     try{
       const reader = new FileReader();
@@ -59,9 +58,25 @@ function loadText(file){
   });
 }
 
-async function loadGeoJSON(file, options){
-  const text = await loadText(file);
+/**
+ * テキストをURLから読み込む
+ * @param {string} url
+ * @return {Promise<String>}
+ */
+async function loadTextURL(url){
+  const res = await fetch(url);
+  return res.text();
+}
+
+/**
+ * GeoJSONファイルを読み込む
+ * @param {string} GeoJSONテキスト
+ * @param {Object} options google.maps.MVCObjectに指定する表示オプション
+ * @return {[google.maps.MVCObject]} google.maps.MVCObjectの配列
+ */
+function loadGeoJSON(text, options){
   const json = JSON.parse(text);
+  const result = [];
   
   for(const f of json.features){
     const mapobjects = [];
@@ -121,17 +136,23 @@ async function loadGeoJSON(file, options){
         infoarea.innerHTML = buf.join("");
 
       });
-      googlemap.objects.push(mo);
-      mo.setMap(googlemap.map);
+      result.push(mo);
     }
   }
-  return json.features;
+  
+  return result;
 }
 
-async function loadGPX(file, options){
-  const text = await loadText(file);
+/**
+ * GPXファイルを読み込む
+ * @param {string} GPXテキスト
+ * @param {Object} options google.maps.MVCObjectに指定する表示オプション
+ * @return {[google.maps.MVCObject]} google.maps.MVCObjectの配列
+ */
+function loadGPX(text, options){
   const parser = new DOMParser();
   const xml = parser.parseFromString(text, "text/xml");
+  const result = [];
   
   const trksegs = xml.querySelectorAll("trkseg");
   for(const trkseg of trksegs){
@@ -141,15 +162,22 @@ async function loadGPX(file, options){
       geodesic: true,
       ...options
     });
-    googlemap.objects.push(line);
-    line.setMap(googlemap.map);
+    result.push(line);
   }
+  
+  return result;
 }
 
-async function loadKML(file, options){
-  const text = await loadText(file);
+/**
+ * KMLファイルを読み込む
+ * @param {string} text KMLテキスト
+ * @param {Object} options google.maps.MVCObjectに指定する表示オプション
+ * @return {[google.maps.MVCObject]} google.maps.MVCObjectの配列
+ */
+function loadKML(text, options){
   const parser = new DOMParser();
   const xml = parser.parseFromString(text, "text/xml");
+  const result = [];
   
   const placemarks = xml.querySelectorAll("Placemark");
   for(const p of placemarks){
@@ -194,9 +222,10 @@ async function loadKML(file, options){
       infoarea.innerHTML = "<pre>" + description.textContent + "</pre>";
     });
     
-    googlemap.objects.push(mo);
-    mo.setMap(googlemap.map);
+    result.push(mo);
   }
+  
+  return result;
 }
 
 /**
@@ -255,14 +284,20 @@ window.addEventListener("DOMContentLoaded", async function(){
         
         const ext = file.name.split(".").pop().toLowerCase();
         if((ext === "geojson") || (ext === "json")){
-          features = features.concat(await loadGeoJSON(file, options));
+          let text = await loadTextFile(file);
+          googlemap.objects = googlemap.objects.concat(loadGeoJSON(text, options));
         }else if(ext === "gpx"){
-          features = features.concat(await loadGPX(file, options));
+          let text = await loadTextFile(file);
+          googlemap.objects = googlemap.objects.concat(loadGPX(text, options));
         }else if(ext === "kml"){
-          features = features.concat(await loadKML(file, options));
+          let text = await loadTextFile(file);
+          googlemap.objects = googlemap.objects.concat(loadKML(text, options));
         }
       }
       
+      for(const o of googlemap.objects){
+        o.setMap(googlemap.map);
+      }
       //fitBounds();
       //showRoutes();
       
