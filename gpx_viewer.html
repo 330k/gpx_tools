@@ -187,7 +187,7 @@ function loadKML(text, options){
     let mo = null;
     
     if(point){
-      const c = point.querySelector("coordinates").textContent.split(/[\s\n]+/).map(e => e.split(","));
+      const c = point.querySelector("coordinates").textContent.trim().split(/[\s\n]+/).map(e => e.split(","));
       /*mo = new google.maps.Marker({
         position: {lat: c[0][1] - 0, lng: c[0][0] - 0},
         ...options
@@ -200,14 +200,14 @@ function loadKML(text, options){
         ...options
       });
     }else if(linestring){
-      const c = linestring.querySelector("coordinates").textContent.split(/[\s\n]+/).map(e => e.split(","));
+      const c = linestring.querySelector("coordinates").textContent.trim().split(/[\s\n]+/).map(e => e.split(","));
       mo = new google.maps.Polyline({
         path: c.map(e => ({lat: e[1] - 0, lng: e[0] - 0})),
         geodesic: true,
         ...options
       });
     }else if(polygon){
-      const c = polygon.querySelector("coordinates").textContent.split(/[\s\n]+/).map(e => e.split(","));
+      const c = polygon.querySelector("coordinates").textContent.trim().split(/[\s\n]+/).map(e => e.split(","));
       mo = new google.maps.Polygon({
         path: c.map(e => ({lat: e[1] - 0, lng: e[0] - 0})),
         geodesic: true,
@@ -252,6 +252,17 @@ function fitBounds(){
   }
 }
 
+/**
+ * Google Mapsに表示されたオブジェクトをクリア
+ */
+function clearFeatures(){
+  for(const o of googlemap.objects){
+    o.setMap(null);
+  }
+  googlemap.objects = [];
+  stylefunc = styleGenerator();
+}
+
 function* styleGenerator(){
   //const colors = ["#3f3d9a", "#9a3d71", "#9a8c3d", "#3d9a56", "#3d5a9a", "#9a3d90", "#9a6d3d", "#439a3d", "#3d799a", "#843d9a", "#9a4e3d", "#629a3d"];
   const colors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#00ffff", "#ff00ff"];
@@ -266,7 +277,7 @@ function* styleGenerator(){
     i++;
   }
 }
-const stylefunc = styleGenerator();
+let stylefunc = styleGenerator();
 
 window.addEventListener("DOMContentLoaded", async function(){
   
@@ -427,7 +438,7 @@ html, body {
   flex: 0 0 70%;
 }
 #droparea {
-  flex: 0 0 48px;
+  flex: 1 1 200px;
   margin: 1px;
   border: 1px solid gray;
   border-radius: 3px;
@@ -457,6 +468,12 @@ input[type=file] {
 }
 #droparea:hover {
   background-color: #ddd;
+}
+#clearbutton {
+  /*height: 100%;
+  width: 100%;
+  border-width: 0px;*/
+  margin: 1px;
 }
 
 #loader_bg {
@@ -496,7 +513,11 @@ input[type=file] {
 <body>
 <div id="wrapper">
  <div id="side_panel">
-  <div id="droparea"><label>GeoJSON, GPX, KML<br><input type="file" id="file_base" accept=".json,.geojson,.kml,.gpx" multiple></label></div>
+  <div style="display: flex; flex-direction: row;">
+   <div id="droparea"><label>Select GeoJSON, GPX, KML files<br><input type="file" id="file_base" accept=".json,.geojson,.kml,.gpx" multiple></label></div>
+   <button id="clearbutton" onclick="clearFeatures();">Clear</button>
+  </div>
+  <div id="filelist"></div>
   <div id="infoarea"></div>
  </div>
  <div id="map_canvas"></div>
