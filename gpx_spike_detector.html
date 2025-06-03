@@ -60,7 +60,7 @@ function initMap(){
  * @param {number} lon2
  * @return {number} distance [m]
  */
- const hubeny = (function(){
+const hubeny = (function(){
   const a = 6378137.0;
   const f = 1 / 298.257223563;
   const e2 = f * (2 - f);
@@ -270,6 +270,7 @@ function detectSpike(){
   
   const threshold2 = document.getElementById("spike_length_threshold").value - 0;
   const threshold1 = threshold2 + 500;
+  console.time("detectSpike");
   
   for(const coords of trksegs){
     for(let i = 0; i < coords.length; i++){
@@ -279,7 +280,7 @@ function detectSpike(){
         }
         if((coords[i].lat === coords[j].lat) && (coords[i].lng === coords[j].lng)){
           // 折り返している部分が見つかった
-          console.log([i, j, coords[j].dist - coords[i].dist, threshold2]);
+          console.log({start: i, end: j, distance: coords[j].dist - coords[i].dist, threshold2: threshold2});
           
           // 折り返し部分の距離がthreshold2以下ならヒゲとして検出する
           if(coords[j].dist - coords[i].dist < threshold2){
@@ -306,6 +307,7 @@ function detectSpike(){
     }
   }
   
+  console.timeEnd("detectSpike");
   console.log(spikes);
   
 }
