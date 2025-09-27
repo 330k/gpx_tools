@@ -818,7 +818,8 @@ async function addElevationGSI(gpxdocs){
   
   for(const gpxdoc of gpxdocs){
     let eles = gpxdoc.querySelectorAll("ele");
-    trkpts_array.push(...Array.from(gpxdoc.querySelectorAll("trkpt, rtept, wpt")));
+    //trkpts_array.push(...Array.from(gpxdoc.querySelectorAll("trkpt, rtept, wpt")));
+    trkpts_array.push(...Array.from(gpxdoc.querySelectorAll("trkpt")));
     
     for(const ele of eles){
       ele.parentNode.removeChild(ele);
