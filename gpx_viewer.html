@@ -184,6 +184,7 @@ function loadKML(text, options){
     const point = p.querySelector("Point");
     const linestring = p.querySelector("LineString");
     const polygon = p.querySelector("Polygon");
+    const track = p.querySelector("Track");
     let mo = null;
     
     if(point){
@@ -213,16 +214,25 @@ function loadKML(text, options){
         geodesic: true,
         ...options
       });
+    }else if(track){
+      const c = [...track.querySelectorAll("coord")].map(e => (e.textContent.split(/[\s\n]+/)));
+      mo = new google.maps.Polyline({
+        path: c.map(e => ({lat: e[1] - 0, lng: e[0] - 0})),
+        geodesic: true,
+        ...options
+      });
     }
     
-    mo.addListener("click", function(){
-      const infoarea = document.getElementById("infoarea");
-      const description = p.querySelector("description");
-      
-      infoarea.innerHTML = "<pre>" + description.textContent + "</pre>";
-    });
-    
-    result.push(mo);
+    if(mo){
+      mo.addListener("click", function(){
+        const infoarea = document.getElementById("infoarea");
+        const description = p.querySelector("description");
+
+        infoarea.innerHTML = "<pre>" + description.textContent + "</pre>";
+      });
+
+      result.push(mo);
+    }
   }
   
   return result;
