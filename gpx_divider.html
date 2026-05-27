@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>GPX 10m間隔補間ツール</title>
+</head>
+<body>
+    <h2>GPX 10m間隔補間ツール</h2>
+    <input type="file" id="fileInput" accept=".gpx"><br><br>
+    <button id="processBtn" disabled>GPXを処理してダウンロード</button>
+
+    <script>
+        let xmlDoc = null;
+        let fileName = "output.gpx";
+
+        // 地球の半径 (メートル)
+        const R = 6371000;
+
+        // 度からラジアンへの変換
+        const toRad = deg => deg * Math.PI / 180;
+
+        // 2点間の距離を計算 (ハバサインの公式)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // ファイル読み込み処理
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            fileName = "dense_" + file.name;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const parser = new DOMParser();
+                xmlDoc = parser.parseFromString(evt.target.result, "application/xml");
+                document.getElementById('processBtn').disabled = false;
+            };
+            reader.readAsText(file);
+        });
+
+        // 処理＆ダウンロード
+        document.getElementById('processBtn').addEventListener('click', function() {
+            if (!xmlDoc) return;
+
+            const trkseg = xmlDoc.querySelector('trkseg');
+            if (!trkseg) {
+                alert('trkseg 要素が見つかりませんでした。');
+                return;
+            }
+
+            const trkpts = Array.from(trkseg.querySelectorAll('trkpt'));
+            if (trkpts.length < 2) {
+                alert('点（trkpt）が足りません。');
+                return;
+            }
+
+            // 新しい trkseg を作成して中身を入れ替える
+            const newTrkseg = xmlDoc.createElementNS(trkseg.namespaceURI, 'trkseg');
+
+            for (let i = 0; i < trkpts.length - 1; i++) {
+                const pt1 = trkpts[i];
+                const pt2 = trkpts[i + 1];
+
+                const lat1 = parseFloat(pt1.getAttribute('lat'));
+                const lon1 = parseFloat(pt1.getAttribute('lon'));
+                const lat2 = parseFloat(pt2.getAttribute('lat'));
+                const lon2 = parseFloat(pt2.getAttribute('lon'));
+
+                // クローンして追加
+                newTrkseg.appendChild(pt1.cloneNode(true));
+
+                const distance = calculateDistance(lat1, lon1, lat2, lon2);
+
+                // 10m以上離れている場合、等分して補間
+                if (distance >= 10) {
+                    const divisions = Math.ceil(distance / 9.9); // 10m未満にするため9.9mで計算
+
+                    for (let j = 1; j < divisions; j++) {
+                        const ratio = j / divisions;
+                        const interstitialLat = lat1 + (lat2 - lat1) * ratio;
+                        const interstitialLon = lon1 + (lon2 - lon1) * ratio;
+
+                        // 新しい trkpt 要素の生成
+                        const newPt = xmlDoc.createElementNS(trkseg.namespaceURI, 'trkpt');
+                        newPt.setAttribute('lat', interstitialLat.toFixed(7));
+                        newPt.setAttribute('lon', interstitialLon.toFixed(7));
+
+                        // 元の点に time などの子要素があれば、最初の点のものを簡易的にコピー（省略も可）
+                        const timeNode = pt1.querySelector('time');
+                        if (timeNode) {
+                            const newTime = xmlDoc.createElementNS(trkseg.namespaceURI, 'time');
+                            // 時間も線形補間（必要なければこの time 処理のブロックごと削除してください）
+                            const t1 = new Date(timeNode.textContent).getTime();
+                            const timeNode2 = pt2.querySelector('time');
+                            if (timeNode2) {
+                                const t2 = new Date(timeNode2.textContent).getTime();
+                                const interstitialTime = new Date(t1 + (t2 - t1) * ratio);
+                                newTime.textContent = interstitialTime.toISOString();
+                                newPt.appendChild(newTime);
+                            }
+                        }
+
+                        newTrkseg.appendChild(newPt);
+                    }
+                }
+            }
+
+            // 最後の点を追加
+            newTrkseg.appendChild(trkpts[trkpts.length - 1].cloneNode(true));
+
+            // 古い trkseg を新しいものに置き換え
+            trkseg.parentNode.replaceChild(newTrkseg, trkseg);
+
+            // XMLを文字列に戻してダウンロード
+            const serializer = new XMLSerializer();
+            const xmlString = serializer.serializeToString(xmlDoc);
+            const blob = new Blob([xmlString], { type: 'application/gpx+xml' });
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+    </script>
+</body>
+</html>
