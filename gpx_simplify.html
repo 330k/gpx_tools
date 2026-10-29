@@ -448,10 +448,10 @@ function mergeTrkseg(gpxdocs){
  */
 function splitTrkseg(gpxdocs, threashold){
   for(const gpxdoc of gpxdocs){
-    const trksegs = Array.from(gpxdoc.querySelectorAll("trkseg"));
+    const trksegs = gpxdoc.querySelectorAll("trkseg");
     const ns = gpxdoc.documentElement.namespaceURI;
     for(const trkseg of trksegs){
-      const trkpts = Array.from(trkseg.querySelectorAll("trkpt"));
+      const trkpts = trkseg.querySelectorAll("trkpt");
 
       if(trkpts.length >= 2){
         const fragment = gpxdoc.createDocumentFragment();
