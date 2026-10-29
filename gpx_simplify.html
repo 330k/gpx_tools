@@ -245,6 +245,13 @@ function processGPX(){
       const xmldocs = xmltexts.map((e, i) => parser.parseFromString(e, "text/xml"));
       console.timeEnd("parseXML");
 
+      if(document.getElementById("delete_others").checked === true){
+        // この後の処理で使用しないので「高度と時刻以外の情報を削除」は先に実行できる(trkptが小さくなるので高速化)
+        console.time("deleteElements-others");
+        deleteElements(xmldocs, "trkpt > *", "ele, time");
+        //deleteElements(xmldocs, "trkpt > *:not(ele, time)", ""); // CSS Selector Level 4
+        console.timeEnd("deleteElements-others");
+      }
       if(document.getElementById("merge_gpx").checked === true){
         console.time("mergeGPX");
         mergeGPX(xmldocs);
@@ -299,12 +306,6 @@ function processGPX(){
         console.time("deleteElements-time");
         deleteElements(xmldocs, "trkpt > time, rtept > time, wpt > time", "");
         console.timeEnd("deleteElements-time");
-      }
-      if(document.getElementById("delete_others").checked === true){
-        console.time("deleteElements-others");
-        deleteElements(xmldocs, "trkpt > *", "ele, time");
-        //deleteElements(xmldocs, "trkpt > *:not(ele, time)", ""); // CSS Selector Level 4
-        console.timeEnd("deleteElements-others");
       }
       
       if(document.getElementById("delete_whitespaces").checked === true){
@@ -425,16 +426,16 @@ function mergeTrk(gpxdocs){
  */
 function mergeTrkseg(gpxdocs){
   for(const gpxdoc of gpxdocs){
-    let trks = gpxdoc.querySelectorAll("gpx > trk");
+    const trks = gpxdoc.querySelectorAll("gpx > trk");
     for(const trk of trks){
-      let trksegs = trk.querySelectorAll("trkseg");
+      const trksegs = trk.querySelectorAll("trkseg");
+      const fragment = document.createDocumentFragment();
       for(let k = 1; k < trksegs.length; k++){
-        let trkpts = trksegs[k].querySelectorAll("trkpt");
-        for(const trkpt of trkpts){
-          trksegs[0].appendChild(trkpt);
-        }
-        trksegs[k].parentNode.removeChild(trksegs[k]);
+        const trkseg = trksegs[k];
+        fragment.append(...trkseg.children);
+        trkseg.remove();
       }
+      trksegs[0].appendChild(fragment);
       console.log("merge trkseg: " + trksegs.length + " to " + trk.querySelectorAll("trkseg").length);
     }
   }
@@ -447,12 +448,15 @@ function mergeTrkseg(gpxdocs){
  */
 function splitTrkseg(gpxdocs, threashold){
   for(const gpxdoc of gpxdocs){
-    let trksegs = gpxdoc.querySelectorAll("trkseg");
+    const trksegs = Array.from(gpxdoc.querySelectorAll("trkseg"));
+    const ns = gpxdoc.documentElement.namespaceURI;
     for(const trkseg of trksegs){
-      let trkpts = trkseg.querySelectorAll("trkpt");
+      const trkpts = Array.from(trkseg.querySelectorAll("trkpt"));
+
       if(trkpts.length >= 2){
-        let currentTrkseg = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "trkseg");
-        trkseg.parentNode.appendChild(currentTrkseg);
+        const fragment = gpxdoc.createDocumentFragment();
+        let currentTrkseg = gpxdoc.createElementNS(ns, "trkseg");
+        const parentNode = trkseg.parentNode;
 
         currentTrkseg.appendChild(trkpts[0]);
         let time = trkpts[0].querySelector("time");
@@ -467,16 +471,16 @@ function splitTrkseg(gpxdocs, threashold){
           if(time !== null){
             newDate = Date.parse(time.textContent);
             if(newDate - oldDate > threashold){
-              currentTrkseg = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "trkseg");
-              trkseg.parentNode.appendChild(currentTrkseg);
+              fragment.appendChild(currentTrkseg);
+              currentTrkseg = gpxdoc.createElementNS(ns, "trkseg");
               console.log("split trkseg");
             }
             oldDate = newDate;
           }
           currentTrkseg.appendChild(trkpts[k]);
         }
-        // 元のtrksegを削除
-        trkseg.parentNode.removeChild(trkseg);
+        fragment.appendChild(currentTrkseg);
+        parentNode.replaceChild(fragment, trkseg);
       }
     }
   }
