@@ -371,7 +371,7 @@ function processGPX(){
  * @param {Array<XMLDocument>} gpxdocs 処理対象GPXファイル
  */
 function mergeGPX(gpxdocs){
-  if(gpxdocs.length > 1){
+  if(gpxdocs.length >= 2){
     const newnodes = [];
     
     // wpt, rte, trkの順に追加
@@ -409,14 +409,16 @@ function mergeGPX(gpxdocs){
 function mergeTrk(gpxdocs){
   for(const gpxdoc of gpxdocs){
     let trks = gpxdoc.querySelectorAll("gpx > trk");
-    for(let j = 1; j < trks.length; j++){
-      let trksegs = trks[j].querySelectorAll("trkseg");
-      for(const trkseg of trksegs){
-        trks[0].appendChild(trkseg);
+    if(trks.length >= 2){
+      for(let j = 1; j < trks.length; j++){
+        let trksegs = trks[j].querySelectorAll("trkseg");
+        for(const trkseg of trksegs){
+          trks[0].appendChild(trkseg);
+        }
+        trks[j].parentNode.removeChild(trks[j]);
       }
-      trks[j].parentNode.removeChild(trks[j]);
+      console.log("merge trk: " + trks.length + " to " + gpxdoc.querySelectorAll("gpx > trk").length);
     }
-    console.log("merge trk: " + trks.length + " to " + gpxdoc.querySelectorAll("gpx > trk").length);
   }
 }
 
@@ -429,14 +431,21 @@ function mergeTrkseg(gpxdocs){
     const trks = gpxdoc.querySelectorAll("gpx > trk");
     for(const trk of trks){
       const trksegs = trk.querySelectorAll("trkseg");
-      const fragment = document.createDocumentFragment();
-      for(let k = 1; k < trksegs.length; k++){
-        const trkseg = trksegs[k];
-        fragment.append(...trkseg.children);
-        trkseg.remove();
+      if(trksegs.length >= 2){
+        const buf = [];
+        for(let k = 0; k < trksegs.length; k++){
+          // extensions要素は結合しない
+          buf.push(...([...trksegs[k].querySelectorAll("trkpt")].map(e => e.outerHTML.replace(/<trkpt\s+xmlns="[^"]*"/, "<trkpt"))));
+          if(k > 0){
+            // 最初の要素だけ残して削除
+            trksegs[k].remove();
+          }
+        }
+        const newTrkseg = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "trkseg");
+        newTrkseg.innerHTML = buf.join("");
+        trk.replaceChild(newTrkseg, trksegs[0]);
+        console.log("merge trkseg: " + trksegs.length + " to " + trk.querySelectorAll("trkseg").length);
       }
-      trksegs[0].appendChild(fragment);
-      console.log("merge trkseg: " + trksegs.length + " to " + trk.querySelectorAll("trkseg").length);
     }
   }
 }
