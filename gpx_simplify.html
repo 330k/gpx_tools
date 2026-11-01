@@ -449,7 +449,6 @@ function mergeTrkseg(gpxdocs){
 function splitTrkseg(gpxdocs, threashold){
   for(const gpxdoc of gpxdocs){
     const trksegs = gpxdoc.querySelectorAll("trkseg");
-    const ns = gpxdoc.documentElement.namespaceURI;
     for(const trkseg of trksegs){
       const trkpts = trkseg.querySelectorAll("trkpt");
 
@@ -468,17 +467,19 @@ function splitTrkseg(gpxdocs, threashold){
             }
             oldDate = newDate;
           }else if(k === 0){
+            // 1番目の要素はtime要素がなくても必ず追加する
             trkptsXmls.push([]);
           }
-          trkptsXmls[trkptsXmls.length - 1].push(trkpts[k].outerHTML.replace(/<trkpt\s+xmlns="[^"]*"/, '<trkpt')); // あとでまとめてreplaceするより毎回replaceするほうが速かった。
+          trkptsXmls[trkptsXmls.length - 1].push(trkpts[k].outerHTML.replace(/<trkpt\s+xmlns="[^"]*"/, "<trkpt")); // あとでまとめてreplaceするより毎回replaceするほうが速かった。
         }
 
         if(trkptsXmls.length >= 2){
           // 分割処理を行う場合のみ要素を置き換える
           const fragment = gpxdoc.createDocumentFragment();
+          const ns = gpxdoc.documentElement.namespaceURI;
           for(const nts of trkptsXmls){
             const newTrkseg = gpxdoc.createElementNS(ns, "trkseg");
-            newTrkseg.innerHTML = nts.join('');
+            newTrkseg.innerHTML = nts.join("");
             fragment.appendChild(newTrkseg);
           }
           parentNode.replaceChild(fragment, trkseg);
