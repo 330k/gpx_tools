@@ -441,6 +441,11 @@ function mergeTrkseg(gpxdocs){
             trksegs[k].remove();
           }
         }
+        // 最初のtrkseg要素内にextensionsがある場合は追加したいが、検証できるデータを見たことがない
+        const extensions = trksegs[0].querySelector("extensions");
+        if(extensions){
+          buf.push(extensions.outerHTML.replace(/<extensions\s+xmlns="[^"]*"/, "<extensions"));
+        }
         const newTrkseg = gpxdoc.createElementNS(gpxdoc.documentElement.namespaceURI, "trkseg");
         newTrkseg.innerHTML = buf.join("");
         trk.replaceChild(newTrkseg, trksegs[0]);
