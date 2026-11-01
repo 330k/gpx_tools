@@ -468,11 +468,11 @@ function splitTrkseg(gpxdocs, threashold){
             }
             oldDate = newDate;
           }
-          trkptsXmls[trkptsXmls.length - 1].push(trkpts[k].outerHTML.replace(/<trkpt\s+xmlns="[^"]*"/, '<trkpt'));
+          trkptsXmls[trkptsXmls.length - 1].push(trkpts[k].outerHTML.replace(/<trkpt\s+xmlns="[^"]*"/, '<trkpt')); // あとでまとめてreplaceするより毎回replaceするほうが速かった。
         }
 
         if(trkptsXmls.length >= 2){
-          // 分割処理を行う場合のみ分割する
+          // 分割処理を行う場合のみ要素を置き換える
           const fragment = gpxdoc.createDocumentFragment();
           for(const nts of trkptsXmls){
             const newTrkseg = gpxdoc.createElementNS(ns, "trkseg");
