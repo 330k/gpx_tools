@@ -467,6 +467,8 @@ function splitTrkseg(gpxdocs, threashold){
               console.log("split trkseg");
             }
             oldDate = newDate;
+          }else if(k === 0){
+            trkptsXmls.push([]);
           }
           trkptsXmls[trkptsXmls.length - 1].push(trkpts[k].outerHTML.replace(/<trkpt\s+xmlns="[^"]*"/, '<trkpt')); // あとでまとめてreplaceするより毎回replaceするほうが速かった。
         }
