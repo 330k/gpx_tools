@@ -454,33 +454,33 @@ function splitTrkseg(gpxdocs, threashold){
       const trkpts = trkseg.querySelectorAll("trkpt");
 
       if(trkpts.length >= 2){
-        const fragment = gpxdoc.createDocumentFragment();
-        let currentTrkseg = gpxdoc.createElementNS(ns, "trkseg");
+        const trkptsXmls = [];
         const parentNode = trkseg.parentNode;
+        let oldDate = null;
 
-        currentTrkseg.appendChild(trkpts[0]);
-        let time = trkpts[0].querySelector("time");
-        if(time !== null){
-          oldDate = Date.parse(time.textContent);
-        }else{
-          oldDate = 0;
-        }
-
-        for(let k = 1; k < trkpts.length; k++){
-          time = trkpts[k].querySelector("time");
+        for(let k = 0; k < trkpts.length; k++){
+          let time = trkpts[k].querySelector("time");
           if(time !== null){
             newDate = Date.parse(time.textContent);
             if(newDate - oldDate > threashold){
-              fragment.appendChild(currentTrkseg);
-              currentTrkseg = gpxdoc.createElementNS(ns, "trkseg");
+              trkptsXmls.push([]);
               console.log("split trkseg");
             }
             oldDate = newDate;
           }
-          currentTrkseg.appendChild(trkpts[k]);
+          trkptsXmls[trkptsXmls.length - 1].push(trkpts[k].outerHTML.replace(/<trkpt\s+xmlns="[^"]*"/, '<trkpt'));
         }
-        fragment.appendChild(currentTrkseg);
-        parentNode.replaceChild(fragment, trkseg);
+
+        if(trkptsXmls.length >= 2){
+          // 分割処理を行う場合のみ分割する
+          const fragment = gpxdoc.createDocumentFragment();
+          for(const nts of trkptsXmls){
+            const newTrkseg = gpxdoc.createElementNS(ns, "trkseg");
+            newTrkseg.innerHTML = nts.join('');
+            fragment.appendChild(newTrkseg);
+          }
+          parentNode.replaceChild(fragment, trkseg);
+        }
       }
     }
   }
