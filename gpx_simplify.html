@@ -1170,8 +1170,19 @@ function createGPXDownloadLink(gpxdocs, downloadnames){
     // カシミール向けに空要素を生成しない
     let gpxdoc = gpxdocs[i];
     let gpxtext = serializer.serializeToString(gpxdoc).replace(/<trkpt(.*?)\/>/g, "<trkpt$1><\/trkpt>");
-    const e = document.createElement("a");
 
+    // ルート要素にあるxmlnsが子孫要素に出現していたら削除
+    const rootNSs = [...gpxdoc.documentElement.attributes].filter(e => e.name.startsWith('xmlns:'));
+    const seenNamespaces = new Set();
+    gpxtext = gpxtext.replace(new RegExp(rootNSs.map(e => ('( ' + e.name + '="' + e.value + '")')).join("|"), "g"), (match) => {
+      if (seenNamespaces.has(match)) {
+        return ''; // すでに登場していれば削除（空白が余る場合は適宜調整）
+      }
+      seenNamespaces.add(match);
+      return match; // 初登場（ルート要素）は残す
+    });
+
+    const e = document.createElement("a");
     if(window.URL && window.URL.createObjectURL){
       let blob;
       try{
